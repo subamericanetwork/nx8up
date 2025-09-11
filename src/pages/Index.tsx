@@ -1,12 +1,35 @@
 import { useState } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, TrendingUp, Target, Zap, ArrowRight, Play, BarChart3, Wallet, Settings } from "lucide-react"
+import { Users, TrendingUp, Target, Zap, ArrowRight, Play, BarChart3, Wallet, Settings, LogOut } from "lucide-react"
 import heroImage from "@/assets/nx8up-hero.jpg"
 
 const Index = () => {
+  const { user, signOut, loading } = useAuth();
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<'landing' | 'creator' | 'sponsor'>('landing')
+
+  const handleAuthAction = () => {
+    if (user) {
+      signOut();
+    } else {
+      navigate('/auth');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (activeView === 'creator') {
     return <CreatorDashboard onBack={() => setActiveView('landing')} />
@@ -28,33 +51,71 @@ const Index = () => {
           />
           <div className="absolute inset-0 bg-brand-gradient-subtle" />
         </div>
-        <div className="relative z-10 container mx-auto px-4 py-32 text-center">
-          <Badge variant="secondary" className="mb-6 bg-primary/10 text-primary border-primary/20">
-            Revolutionary Creator Pooling Platform
-          </Badge>
-          <h1 className="text-6xl font-bold mb-6 bg-brand-gradient bg-clip-text text-transparent">
-            NX8UP
-          </h1>
-          <p className="text-xl text-foreground/80 mb-8 max-w-3xl mx-auto leading-relaxed">
-            The first pooling system for nano/micro influencers. Brands buy creator pools, 
-            not individual influencers. Performance-based payouts. Automated execution.
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Button 
-              variant="hero" 
-              size="lg" 
-              onClick={() => setActiveView('creator')}
-              className="shadow-brand"
-            >
-              Join as Creator <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button 
-              variant="heroSecondary" 
-              size="lg"
-              onClick={() => setActiveView('sponsor')}
-            >
-              Browse Pools <Target className="ml-2 h-5 w-5" />
-            </Button>
+        <div className="relative z-10 container mx-auto px-4 py-20">
+          {/* Navigation */}
+          <nav className="flex justify-between items-center mb-16">
+            <div className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              NX8UP
+            </div>
+            <div className="flex gap-4 items-center">
+              {user && (
+                <span className="text-sm text-foreground/80">
+                  Welcome back!
+                </span>
+              )}
+              <Button 
+                variant="ghost" 
+                onClick={handleAuthAction}
+                className="flex items-center gap-2 text-foreground/80 hover:text-foreground"
+              >
+                {user ? (
+                  <>
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </>
+                ) : (
+                  'Login'
+                )}
+              </Button>
+              {!user && (
+                <Button 
+                  className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                  onClick={() => navigate('/auth')}
+                >
+                  Get Started
+                </Button>
+              )}
+            </div>
+          </nav>
+
+          <div className="text-center">
+            <Badge variant="secondary" className="mb-6 bg-primary/10 text-primary border-primary/20">
+              Revolutionary Creator Pooling Platform
+            </Badge>
+            <h1 className="text-6xl font-bold mb-6 bg-brand-gradient bg-clip-text text-transparent">
+              NX8UP
+            </h1>
+            <p className="text-xl text-foreground/80 mb-8 max-w-3xl mx-auto leading-relaxed">
+              The first pooling system for nano/micro influencers. Brands buy creator pools, 
+              not individual influencers. Performance-based payouts. Automated execution.
+            </p>
+            <div className="flex gap-4 justify-center">
+              <Button 
+                variant="hero" 
+                size="lg" 
+                onClick={() => user ? setActiveView('creator') : navigate('/auth')}
+                className="shadow-brand"
+              >
+                Join as Creator <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button 
+                variant="heroSecondary" 
+                size="lg"
+                onClick={() => user ? setActiveView('sponsor') : navigate('/auth')}
+              >
+                Browse Pools <Target className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </section>
