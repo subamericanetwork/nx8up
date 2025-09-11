@@ -209,6 +209,8 @@ export default function SocialMediaConnections() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   };
+
+  const handleDisconnect = async (accountId: string, platform: string) => {
     try {
       const { error } = await supabase
         .from('social_media_accounts')
