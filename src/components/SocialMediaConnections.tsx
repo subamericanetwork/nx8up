@@ -102,9 +102,12 @@ export default function SocialMediaConnections() {
   };
 
   const handleConnect = async (platform: string) => {
+    console.log('=== CONNECT BUTTON CLICKED ===', { platform, user: !!user });
+    
     const config = platformConfig[platform as keyof typeof platformConfig];
     
     if (!config?.available) {
+      console.log('Platform not available:', platform);
       toast({
         title: 'Coming Soon',
         description: `${config.name} integration will be available soon!`,
@@ -116,7 +119,7 @@ export default function SocialMediaConnections() {
     setConnecting(platform);
     
     try {
-      console.log('Connecting to platform:', platform);
+      console.log('Starting OAuth flow for platform:', platform);
       
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
@@ -126,7 +129,7 @@ export default function SocialMediaConnections() {
         }
       });
 
-      console.log('OAuth response:', { data, error });
+      console.log('OAuth initiation response:', { data, error, platform });
 
       if (error) {
         console.error('Supabase function error:', error);

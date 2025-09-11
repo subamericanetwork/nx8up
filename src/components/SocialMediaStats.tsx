@@ -184,6 +184,8 @@ export default function SocialMediaStats() {
   };
 
   const handleConnectAccount = async (platform: string) => {
+    console.log('=== CONNECT ACCOUNT CLICKED (SocialMediaStats) ===', { platform, user: !!user });
+    
     try {
       // Call OAuth function to get auth URL
       const { data, error } = await supabase.functions.invoke('social-oauth', {
@@ -194,16 +196,23 @@ export default function SocialMediaStats() {
         }
       });
 
-      if (error) throw error;
+      console.log('SocialMediaStats OAuth response:', { data, error, platform });
+
+      if (error) {
+        console.error('SocialMediaStats OAuth error:', error);
+        throw error;
+      }
 
       if (data?.auth_url) {
+        console.log('SocialMediaStats redirecting to:', data.auth_url);
         // Redirect to OAuth provider
         window.location.href = data.auth_url;
       } else {
+        console.error('SocialMediaStats: No auth URL received:', data);
         throw new Error('No auth URL received');
       }
     } catch (error) {
-      console.error('Error connecting account:', error);
+      console.error('Error connecting account (SocialMediaStats):', error);
       toast({
         title: 'Error',
         description: `Failed to connect ${platform}. Please try again.`,
