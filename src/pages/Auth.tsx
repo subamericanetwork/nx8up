@@ -73,7 +73,9 @@ export default function Auth() {
     const { error } = await signUp(formData.email, formData.password, formData.fullName, formData.userType);
     
     if (error) {
-      if (error.message.includes('User already registered')) {
+      if (error.message.includes('User already registered') || 
+          error.message.includes('already been registered') ||
+          error.message.includes('user_already_exists')) {
         toast({
           title: 'Account Exists',
           description: 'An account with this email already exists. Please sign in instead.',
