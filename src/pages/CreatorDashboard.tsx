@@ -98,6 +98,75 @@ export default function CreatorDashboard() {
     checkUserType();
   }, [user, navigate]);
 
+  // Handle OAuth callback
+  useEffect(() => {
+    if (!user) return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const platform = urlParams.get('platform');
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
+    
+    if (error) {
+      toast({
+        title: 'Connection Failed',
+        description: 'OAuth authorization was denied or failed',
+        variant: 'destructive'
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, '/creator-dashboard');
+      return;
+    }
+    
+    if (platform && code) {
+      handleOAuthCallback(platform, code);
+    }
+  }, [user, toast]);
+
+  const handleOAuthCallback = async (platform: string, code: string) => {
+    try {
+      toast({
+        title: 'Processing Connection...',
+        description: `Connecting your ${platform} account`,
+      });
+
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: { 
+          action: 'callback',
+          platform,
+          code,
+          redirect_url: `${window.location.origin}/creator-dashboard`
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Connected Successfully!',
+        description: `Your ${platform} account has been connected`,
+      });
+
+      // Clean up URL and reload dashboard data
+      window.history.replaceState({}, document.title, '/creator-dashboard');
+      
+      // Reload dashboard data to show new stats
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      toast({
+        title: 'Connection Failed',
+        description: `Failed to connect ${platform} account. Please try again.`,
+        variant: 'destructive'
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, '/creator-dashboard');
+    }
+  };
+
   // Load dashboard data
   useEffect(() => {
     if (!user) return;
