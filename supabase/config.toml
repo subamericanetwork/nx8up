@@ -1,1 +1,4 @@
 project_id = "plankbahpovnmigfndqr"
+
+[functions.sync-social-stats]
+verify_jwt = true
