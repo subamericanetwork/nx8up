@@ -22,7 +22,7 @@ const getOAuthConfig = (platform: string, redirectUrl: string): OAuthConfig | nu
       return {
         client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
         redirect_uri: baseRedirectUri,
-        scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile',
+        scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/youtube.channel-memberships.creator',
         auth_url: 'https://accounts.google.com/o/oauth2/v2/auth',
         token_url: 'https://oauth2.googleapis.com/token'
       };
@@ -92,8 +92,44 @@ const getUserInfo = async (platform: string, accessToken: string): Promise<any> 
 
   switch (platform) {
     case 'youtube':
+      // First get user info, then get channel info
       userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
-      break;
+      const userInfoResponse = await fetch(userInfoUrl, { headers });
+      
+      if (!userInfoResponse.ok) {
+        throw new Error(`Failed to fetch user info: ${userInfoResponse.statusText}`);
+      }
+      
+      const userInfo = await userInfoResponse.json();
+      
+      // Now get YouTube channel info
+      const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&access_token=${accessToken}`;
+      const channelResponse = await fetch(channelUrl);
+      
+      if (channelResponse.ok) {
+        const channelData = await channelResponse.json();
+        if (channelData.items && channelData.items.length > 0) {
+          const channel = channelData.items[0];
+          // Combine user info with channel info
+          return {
+            ...userInfo,
+            id: channel.id,
+            username: channel.snippet.customUrl || channel.snippet.title,
+            display_name: channel.snippet.title,
+            profile_image_url: channel.snippet.thumbnails?.default?.url || userInfo.picture,
+            subscriber_count: channel.statistics?.subscriberCount || 0,
+            video_count: channel.statistics?.videoCount || 0
+          };
+        }
+      }
+      
+      // Fallback to user info if channel fetch fails
+      return {
+        ...userInfo,
+        username: userInfo.name || userInfo.email,
+        display_name: userInfo.name
+      };
+      
     case 'instagram':
       userInfoUrl = `https://graph.instagram.com/me?fields=id,username,account_type,media_count&access_token=${accessToken}`;
       headers = {}; // Instagram uses access_token in URL
@@ -106,13 +142,16 @@ const getUserInfo = async (platform: string, accessToken: string): Promise<any> 
       break;
   }
 
-  const response = await fetch(userInfoUrl, { headers });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user info: ${response.statusText}`);
-  }
+  // For non-YouTube platforms, use the original logic
+  if (platform !== 'youtube') {
+    const response = await fetch(userInfoUrl, { headers });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user info: ${response.statusText}`);
+    }
 
-  return await response.json();
+    return await response.json();
+  }
 };
 
 serve(async (req) => {

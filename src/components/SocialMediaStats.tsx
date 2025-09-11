@@ -195,25 +195,45 @@ export default function SocialMediaStats() {
   const handleSyncStats = async (accountId: string, platform: string) => {
     setSyncing(accountId);
     try {
+      console.log(`Syncing stats for ${platform} account:`, accountId);
+      
       // Call edge function to sync stats
-      const { error } = await supabase.functions.invoke('sync-social-stats', {
+      const { data, error } = await supabase.functions.invoke('sync-social-stats', {
         body: { accountId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+      
+      if (data?.error) {
+        console.error('Function returned error:', data.error);
+        throw new Error(data.error);
+      }
+      
+      console.log('Stats sync response:', data);
       
       // Reload accounts to show updated stats
       await loadSocialAccounts();
       
       toast({
         title: 'Success',
-        description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} stats updated!`,
+        description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} stats updated! ${data?.stats ? `Found ${data.stats.followers_count} followers` : ''}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing stats:', error);
+      
+      let errorMessage = `Failed to sync ${platform} stats`;
+      if (error.message?.includes('YouTube API')) {
+        errorMessage = 'YouTube API access issue. Try reconnecting your account.';
+      } else if (error.message?.includes('access token')) {
+        errorMessage = 'Authentication expired. Please reconnect your account.';
+      }
+      
       toast({
-        title: 'Error',
-        description: `Failed to sync ${platform} stats`,
+        title: 'Sync Failed',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
@@ -267,19 +287,17 @@ export default function SocialMediaStats() {
                    </CardTitle>
                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                  </div>
-                 <div className="flex items-center space-x-2">
-                   <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                     Connected
-                   </Badge>
-                   <Button
-                     variant="ghost"
-                     size="sm"
-                     onClick={() => handleSyncStats(account.id, account.platform)}
-                     disabled={syncing === account.id}
-                   >
-                     <RefreshCw className={`h-3 w-3 ${syncing === account.id ? 'animate-spin' : ''}`} />
-                   </Button>
-                 </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSyncStats(account.id, account.platform)}
+                      disabled={syncing === account.id}
+                      title={`Refresh ${account.platform} stats`}
+                    >
+                      <RefreshCw className={`h-3 w-3 ${syncing === account.id ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
                </CardHeader>
               <CardContent>
                 <div className="space-y-2">
