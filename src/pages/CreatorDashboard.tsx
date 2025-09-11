@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import SocialMediaStats from '@/components/SocialMediaStats';
+import SocialMediaConnections from '@/components/SocialMediaConnections';
 import { 
   Eye, 
   Send, 
@@ -268,10 +269,11 @@ export default function CreatorDashboard() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="browse">Browse Campaigns</TabsTrigger>
             <TabsTrigger value="applications">My Applications</TabsTrigger>
             <TabsTrigger value="collaborations">Collaborations</TabsTrigger>
+            <TabsTrigger value="social">Social Media</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
           </TabsList>
           
@@ -497,6 +499,11 @@ export default function CreatorDashboard() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+          
+          {/* Social Media Tab */}
+          <TabsContent value="social" className="space-y-4">
+            <SocialMediaConnections />
           </TabsContent>
           
           {/* Content Tab */}
