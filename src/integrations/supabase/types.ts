@@ -297,6 +297,51 @@ export type Database = {
         }
         Relationships: []
       }
+      secure_social_tokens: {
+        Row: {
+          account_id: string
+          created_at: string | null
+          encrypted_access_token: string | null
+          encrypted_refresh_token: string | null
+          id: string
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string | null
+          encrypted_access_token?: string | null
+          encrypted_refresh_token?: string | null
+          id?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string | null
+          encrypted_access_token?: string | null
+          encrypted_refresh_token?: string | null
+          id?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secure_social_tokens_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "safe_social_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secure_social_tokens_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "social_media_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_media_accounts: {
         Row: {
           connected_at: string
