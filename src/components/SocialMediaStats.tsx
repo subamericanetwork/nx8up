@@ -74,13 +74,18 @@ export default function SocialMediaStats() {
       const platform = urlParams.get('platform');
       const state = urlParams.get('state');
       
+      console.log('Checking URL params:', { code: !!code, platform, state });
+      
       if (code && platform) {
+        console.log('OAuth callback detected, processing...');
         handleOAuthCallback(code, platform, state);
       }
     }
   }, [user]);
 
   const handleOAuthCallback = async (code: string, platform: string, state: string | null) => {
+    console.log('Processing OAuth callback:', { platform, code: !!code, state });
+    
     try {
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: {
@@ -92,9 +97,21 @@ export default function SocialMediaStats() {
         }
       });
 
-      if (error) throw error;
+      console.log('OAuth callback response:', { data, error });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (data?.error) {
+        console.error('OAuth callback error:', data.error);
+        throw new Error(data.error);
+      }
 
       if (data?.success) {
+        console.log('OAuth callback successful:', data);
+        
         toast({
           title: 'Success!',
           description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} account connected successfully!`,
@@ -103,16 +120,19 @@ export default function SocialMediaStats() {
         // Clear URL parameters and reload accounts
         window.history.replaceState({}, document.title, window.location.pathname);
         await loadSocialAccounts();
+      } else {
+        console.error('Unexpected response format:', data);
+        throw new Error('Unexpected response from OAuth callback');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('OAuth callback error:', error);
       toast({
         title: 'Connection Failed',
-        description: `Failed to connect ${platform} account. Please try again.`,
+        description: `Failed to connect ${platform} account: ${error.message || 'Unknown error'}`,
         variant: 'destructive'
       });
       
-      // Clear URL parameters
+      // Clear URL parameters even on error
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   };

@@ -64,7 +64,21 @@ export default function SocialMediaConnections() {
 
   useEffect(() => {
     if (!user) return;
+    
     loadConnectedAccounts();
+    
+    // Handle OAuth callback if present in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const platform = urlParams.get('platform');
+    const state = urlParams.get('state');
+    
+    console.log('SocialMediaConnections: Checking URL params:', { code: !!code, platform, state });
+    
+    if (code && platform) {
+      console.log('SocialMediaConnections: OAuth callback detected, processing...');
+      handleOAuthCallback(code, platform, state);
+    }
   }, [user]);
 
   const loadConnectedAccounts = async () => {
@@ -142,7 +156,59 @@ export default function SocialMediaConnections() {
     }
   };
 
-  const handleDisconnect = async (accountId: string, platform: string) => {
+  const handleOAuthCallback = async (code: string, platform: string, state: string | null) => {
+    console.log('SocialMediaConnections: Processing OAuth callback:', { platform, code: !!code, state });
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: {
+          action: 'callback',
+          platform: platform,
+          code: code,
+          state: state,
+          redirect_url: window.location.origin + '/creator-dashboard'
+        }
+      });
+
+      console.log('SocialMediaConnections: OAuth callback response:', { data, error });
+
+      if (error) {
+        console.error('SocialMediaConnections: Supabase function error:', error);
+        throw error;
+      }
+
+      if (data?.error) {
+        console.error('SocialMediaConnections: OAuth callback error:', data.error);
+        throw new Error(data.error);
+      }
+
+      if (data?.success) {
+        console.log('SocialMediaConnections: OAuth callback successful:', data);
+        
+        toast({
+          title: 'Success!',
+          description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} account connected successfully! You can now sync your analytics.`,
+        });
+        
+        // Clear URL parameters and reload accounts
+        window.history.replaceState({}, document.title, window.location.pathname);
+        await loadConnectedAccounts();
+      } else {
+        console.error('SocialMediaConnections: Unexpected response format:', data);
+        throw new Error('Unexpected response from OAuth callback');
+      }
+    } catch (error: any) {
+      console.error('SocialMediaConnections: OAuth callback error:', error);
+      toast({
+        title: 'Connection Failed',
+        description: `Failed to connect ${platform} account: ${error.message || 'Unknown error'}. Please try again.`,
+        variant: 'destructive'
+      });
+      
+      // Clear URL parameters even on error
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  };
     try {
       const { error } = await supabase
         .from('social_media_accounts')
