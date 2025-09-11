@@ -545,6 +545,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      security_compliance_check: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          issue_type: string
+          object_name: string
+          recommendation: string
+          schema_name: string
+        }[]
+      }
       social_media_accounts_safe: {
         Args: Record<PropertyKey, never>
         Returns: {
