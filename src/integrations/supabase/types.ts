@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      applications: {
+        Row: {
+          applied_at: string
+          campaign_id: string
+          creator_id: string
+          id: string
+          proposal: string
+          requested_budget: number | null
+          reviewed_at: string | null
+          reviewer_notes: string | null
+          status: Database["public"]["Enums"]["application_status"]
+        }
+        Insert: {
+          applied_at?: string
+          campaign_id: string
+          creator_id: string
+          id?: string
+          proposal: string
+          requested_budget?: number | null
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+        }
+        Update: {
+          applied_at?: string
+          campaign_id?: string
+          creator_id?: string
+          id?: string
+          proposal?: string
+          requested_budget?: number | null
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           budget_max: number | null
@@ -108,6 +159,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      application_status: "pending" | "accepted" | "rejected" | "withdrawn"
       campaign_status: "draft" | "active" | "paused" | "completed" | "cancelled"
     }
     CompositeTypes: {
@@ -236,6 +288,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      application_status: ["pending", "accepted", "rejected", "withdrawn"],
       campaign_status: ["draft", "active", "paused", "completed", "cancelled"],
     },
   },
