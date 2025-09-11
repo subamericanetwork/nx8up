@@ -22,6 +22,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          glow: "hsl(var(--primary-glow))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -47,6 +48,29 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        // NX8UP Brand Colors
+        brand: {
+          purple: "hsl(var(--brand-purple))",
+          blue: "hsl(var(--brand-blue))",
+        },
+        creator: {
+          primary: "hsl(var(--creator-primary))",
+          secondary: "hsl(var(--creator-secondary))",
+          accent: "hsl(var(--creator-accent))",
+        },
+        sponsor: {
+          primary: "hsl(var(--sponsor-primary))",
+          secondary: "hsl(var(--sponsor-secondary))",
+          accent: "hsl(var(--sponsor-accent))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -57,6 +81,19 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      backgroundImage: {
+        'brand-gradient': 'var(--brand-gradient)',
+        'brand-gradient-subtle': 'var(--brand-gradient-subtle)',
+      },
+      boxShadow: {
+        'brand': 'var(--shadow-brand)',
+        'glow': 'var(--shadow-glow)',
+        'card': 'var(--shadow-card)',
+      },
+      transitionTimingFunction: {
+        'smooth': 'var(--transition-smooth)',
+        'bounce': 'var(--transition-bounce)',
       },
       borderRadius: {
         lg: "var(--radius)",

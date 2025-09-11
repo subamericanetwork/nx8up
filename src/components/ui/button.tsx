@@ -15,6 +15,12 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // NX8UP Brand Variants
+        hero: "bg-brand-gradient text-primary-foreground hover:shadow-glow transform hover:scale-105 transition-all duration-300",
+        heroSecondary: "bg-background/20 backdrop-blur-sm text-foreground border border-foreground/20 hover:bg-background/40 hover:border-foreground/40",
+        primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-brand",
+        creator: "bg-creator-primary text-primary-foreground hover:bg-creator-primary/90",
+        sponsor: "bg-sponsor-primary text-primary-foreground hover:bg-sponsor-primary/90",
       },
       size: {
         default: "h-10 px-4 py-2",
