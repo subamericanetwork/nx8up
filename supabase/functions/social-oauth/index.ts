@@ -250,6 +250,23 @@ serve(async (req) => {
 
       console.log('Account stored successfully:', accountData.id);
 
+      // Automatically sync stats for the newly connected account
+      try {
+        console.log('Attempting to sync stats for newly connected account...');
+        const { data: syncResult, error: syncError } = await supabase.functions.invoke('sync-social-stats', {
+          body: { accountId: accountData.id }
+        });
+        
+        if (syncError) {
+          console.error('Failed to sync stats after connection:', syncError);
+        } else {
+          console.log('Successfully synced stats after connection:', syncResult);
+        }
+      } catch (syncError) {
+        console.error('Error calling sync-social-stats:', syncError);
+        // Don't fail the connection if stats sync fails
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
