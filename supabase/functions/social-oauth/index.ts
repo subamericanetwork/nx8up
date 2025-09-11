@@ -122,22 +122,35 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Social OAuth function called');
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const url = new URL(req.url);
-    const { action, platform, redirect_url, code, state } = await req.json();
+    const requestBody = await req.json();
+    const { action, platform, redirect_url, code, state } = requestBody;
 
     console.log('OAuth request:', { action, platform, redirect_url, code: !!code, state });
+
+    // Check if required environment variables exist
+    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+    
+    console.log('Environment check:', {
+      hasGoogleClientId: !!googleClientId,
+      hasGoogleClientSecret: !!googleClientSecret,
+      googleClientIdLength: googleClientId?.length || 0
+    });
 
     if (action === 'connect') {
       // Step 1: Generate OAuth URL
       const config = getOAuthConfig(platform, redirect_url);
       
       if (!config || !config.client_id) {
-        throw new Error(`OAuth not configured for ${platform}`);
+        console.error(`OAuth not configured for ${platform}`, { config });
+        throw new Error(`OAuth not configured for ${platform}. Missing client ID.`);
       }
 
       // Generate state parameter for CSRF protection
@@ -149,6 +162,8 @@ serve(async (req) => {
       authUrl.searchParams.set('scope', config.scope);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('state', stateParam);
+
+      console.log('Generated auth URL:', authUrl.toString());
 
       return new Response(
         JSON.stringify({ 

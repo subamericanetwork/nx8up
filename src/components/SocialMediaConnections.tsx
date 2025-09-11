@@ -102,6 +102,8 @@ export default function SocialMediaConnections() {
     setConnecting(platform);
     
     try {
+      console.log('Connecting to platform:', platform);
+      
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
           action: 'connect',
@@ -110,21 +112,32 @@ export default function SocialMediaConnections() {
         }
       });
 
-      if (error) throw error;
+      console.log('OAuth response:', { data, error });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (data?.error) {
+        console.error('Function returned error:', data.error);
+        throw new Error(data.error);
+      }
 
       if (data?.auth_url) {
+        console.log('Redirecting to auth URL:', data.auth_url);
         window.location.href = data.auth_url;
       } else {
+        console.error('No auth URL in response:', data);
         throw new Error('No authentication URL received');
       }
     } catch (error) {
       console.error('Error connecting account:', error);
       toast({
         title: 'Connection Failed',
-        description: `Failed to connect ${config?.name}. Please try again.`,
+        description: `Failed to connect ${config?.name}: ${error.message || 'Unknown error'}`,
         variant: 'destructive'
       });
-    } finally {
       setConnecting(null);
     }
   };
