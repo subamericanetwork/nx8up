@@ -92,7 +92,7 @@ const Index = () => {
           </nav>
 
           <div className="text-center">
-            <Badge variant="secondary" className="mb-6 bg-primary/10 text-white border-primary/20">
+            <Badge variant="secondary" className="mb-6 bg-primary/10 text-blue-300 border-primary/20">
               Revolutionary Creator Pooling Platform
             </Badge>
             <h1 className="text-6xl font-bold mb-6 bg-brand-gradient bg-clip-text text-transparent">
