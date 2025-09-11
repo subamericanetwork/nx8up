@@ -124,6 +124,80 @@ export type Database = {
           },
         ]
       }
+      collaborations: {
+        Row: {
+          agreed_budget: number
+          application_id: string | null
+          campaign_id: string
+          contract_terms: string | null
+          created_at: string
+          creator_id: string
+          deadline: string
+          deliverables: string[]
+          id: string
+          sponsor_id: string
+          status: Database["public"]["Enums"]["collaboration_status"]
+          updated_at: string
+        }
+        Insert: {
+          agreed_budget: number
+          application_id?: string | null
+          campaign_id: string
+          contract_terms?: string | null
+          created_at?: string
+          creator_id: string
+          deadline: string
+          deliverables: string[]
+          id?: string
+          sponsor_id: string
+          status?: Database["public"]["Enums"]["collaboration_status"]
+          updated_at?: string
+        }
+        Update: {
+          agreed_budget?: number
+          application_id?: string | null
+          campaign_id?: string
+          contract_terms?: string | null
+          created_at?: string
+          creator_id?: string
+          deadline?: string
+          deliverables?: string[]
+          id?: string
+          sponsor_id?: string
+          status?: Database["public"]["Enums"]["collaboration_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborations_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborations_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -161,6 +235,7 @@ export type Database = {
     Enums: {
       application_status: "pending" | "accepted" | "rejected" | "withdrawn"
       campaign_status: "draft" | "active" | "paused" | "completed" | "cancelled"
+      collaboration_status: "active" | "completed" | "cancelled" | "disputed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -290,6 +365,7 @@ export const Constants = {
     Enums: {
       application_status: ["pending", "accepted", "rejected", "withdrawn"],
       campaign_status: ["draft", "active", "paused", "completed", "cancelled"],
+      collaboration_status: ["active", "completed", "cancelled", "disputed"],
     },
   },
 } as const
