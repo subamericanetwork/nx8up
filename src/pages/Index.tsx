@@ -27,21 +27,8 @@ const Index = () => {
       return;
     }
     
-    // Check user type and redirect accordingly
-    const { data: profile } = await supabase.auth.getUser();
-    if (profile.user) {
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('user_type')
-        .eq('id', profile.user.id)
-        .single();
-      
-      if (userProfile?.user_type === 'creator') {
-        navigate('/creator-dashboard');
-      } else {
-        navigate('/auth');
-      }
-    }
+    // Always redirect creators to dashboard
+    navigate('/creator-dashboard');
   };
 
   if (loading) {
