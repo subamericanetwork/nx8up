@@ -198,6 +198,78 @@ export type Database = {
           },
         ]
       }
+      content: {
+        Row: {
+          collaboration_id: string
+          content_type: Database["public"]["Enums"]["content_type"]
+          content_url: string | null
+          created_at: string
+          creator_id: string
+          description: string | null
+          id: string
+          metrics: Json | null
+          platform: string | null
+          reviewed_at: string | null
+          reviewer_feedback: string | null
+          status: Database["public"]["Enums"]["content_status"]
+          submitted_at: string | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          collaboration_id: string
+          content_type: Database["public"]["Enums"]["content_type"]
+          content_url?: string | null
+          created_at?: string
+          creator_id: string
+          description?: string | null
+          id?: string
+          metrics?: Json | null
+          platform?: string | null
+          reviewed_at?: string | null
+          reviewer_feedback?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          submitted_at?: string | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          collaboration_id?: string
+          content_type?: Database["public"]["Enums"]["content_type"]
+          content_url?: string | null
+          created_at?: string
+          creator_id?: string
+          description?: string | null
+          id?: string
+          metrics?: Json | null
+          platform?: string | null
+          reviewed_at?: string | null
+          reviewer_feedback?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          submitted_at?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_collaboration_id_fkey"
+            columns: ["collaboration_id"]
+            isOneToOne: false
+            referencedRelation: "collaborations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -236,6 +308,13 @@ export type Database = {
       application_status: "pending" | "accepted" | "rejected" | "withdrawn"
       campaign_status: "draft" | "active" | "paused" | "completed" | "cancelled"
       collaboration_status: "active" | "completed" | "cancelled" | "disputed"
+      content_status:
+        | "pending"
+        | "submitted"
+        | "approved"
+        | "rejected"
+        | "revision_requested"
+      content_type: "post" | "story" | "video" | "reel" | "blog" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -366,6 +445,14 @@ export const Constants = {
       application_status: ["pending", "accepted", "rejected", "withdrawn"],
       campaign_status: ["draft", "active", "paused", "completed", "cancelled"],
       collaboration_status: ["active", "completed", "cancelled", "disputed"],
+      content_status: [
+        "pending",
+        "submitted",
+        "approved",
+        "rejected",
+        "revision_requested",
+      ],
+      content_type: ["post", "story", "video", "reel", "blog", "other"],
     },
   },
 } as const
