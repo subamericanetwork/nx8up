@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          budget_max: number | null
+          budget_min: number | null
+          campaign_goals: string | null
+          created_at: string
+          deadline: string | null
+          deliverables: string[] | null
+          description: string
+          id: string
+          requirements: string | null
+          sponsor_id: string
+          status: Database["public"]["Enums"]["campaign_status"]
+          target_audience: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          budget_max?: number | null
+          budget_min?: number | null
+          campaign_goals?: string | null
+          created_at?: string
+          deadline?: string | null
+          deliverables?: string[] | null
+          description: string
+          id?: string
+          requirements?: string | null
+          sponsor_id: string
+          status?: Database["public"]["Enums"]["campaign_status"]
+          target_audience?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          budget_max?: number | null
+          budget_min?: number | null
+          campaign_goals?: string | null
+          created_at?: string
+          deadline?: string | null
+          deliverables?: string[] | null
+          description?: string
+          id?: string
+          requirements?: string | null
+          sponsor_id?: string
+          status?: Database["public"]["Enums"]["campaign_status"]
+          target_audience?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -49,7 +108,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      campaign_status: "draft" | "active" | "paused" | "completed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -176,6 +235,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      campaign_status: ["draft", "active", "paused", "completed", "cancelled"],
+    },
   },
 } as const
