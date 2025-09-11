@@ -30,25 +30,29 @@ const platformConfig = {
     name: 'YouTube',
     icon: Youtube,
     color: 'text-red-500',
-    description: 'Connect your YouTube channel to track subscribers and video performance'
+    description: 'Connect your YouTube channel to track subscribers and video performance',
+    available: true
   },
   instagram: {
     name: 'Instagram', 
     icon: Instagram,
     color: 'text-pink-500',
-    description: 'Connect your Instagram account to track followers and engagement'
+    description: 'Connect your Instagram account to track followers and engagement',
+    available: true
   },
   tiktok: {
     name: 'TikTok',
     icon: Music,
     color: 'text-black',
-    description: 'Connect your TikTok account to track followers and video metrics'
+    description: 'Connect your TikTok account to track followers and video metrics',
+    available: false
   },
   twitter: {
     name: 'X (Twitter)',
     icon: Twitter,
     color: 'text-black',
-    description: 'Connect your X account to track followers and engagement'
+    description: 'Connect your X account to track followers and engagement',
+    available: false
   }
 };
 
@@ -87,6 +91,17 @@ export default function SocialMediaConnections() {
   };
 
   const handleConnect = async (platform: string) => {
+    const config = platformConfig[platform as keyof typeof platformConfig];
+    
+    if (!config?.available) {
+      toast({
+        title: 'Coming Soon',
+        description: `${config.name} integration will be available soon!`,
+        variant: 'default'
+      });
+      return;
+    }
+
     setConnecting(platform);
     
     try {
@@ -109,7 +124,7 @@ export default function SocialMediaConnections() {
       console.error('Error connecting account:', error);
       toast({
         title: 'Connection Failed',
-        description: `Failed to connect ${platformConfig[platform as keyof typeof platformConfig]?.name}. Please try again.`,
+        description: `Failed to connect ${config?.name}. Please try again.`,
         variant: 'destructive'
       });
     } finally {
@@ -224,10 +239,15 @@ export default function SocialMediaConnections() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleConnect(platform)}
-                    disabled={connecting === platform}
+                    disabled={connecting === platform || !config.available}
                     className="px-4"
                   >
-                    {connecting === platform ? 'Connecting...' : 'Connect'}
+                    {connecting === platform 
+                      ? 'Connecting...' 
+                      : config.available 
+                        ? 'Connect' 
+                        : 'Coming Soon'
+                    }
                   </Button>
                 )}
               </div>
