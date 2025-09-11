@@ -70,29 +70,38 @@ export default function SocialMediaStats() {
 
   const loadSocialAccounts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('social_media_accounts_safe')
-        .select(`
-          *,
-          social_media_stats(
-            followers_count,
-            following_count,
-            posts_count,
-            likes_count,
-            views_count,
-            engagement_rate,
-            recorded_at
-          )
-        `)
-        .eq('creator_id', user?.id)
-        .eq('is_active', true)
-        .order('recorded_at', { 
-          foreignTable: 'social_media_stats', 
-          ascending: false 
-        });
+      // Get accounts using the secure function
+      const { data: accountsData, error: accountsError } = await supabase
+        .rpc('social_media_accounts_safe');
 
-      if (error) throw error;
-      setAccounts(data || []);
+      if (accountsError) throw accountsError;
+
+      // Get stats for each account
+      const accountsWithStats = await Promise.all(
+        (accountsData || []).map(async (account: any) => {
+          const { data: statsData } = await supabase
+            .from('social_media_stats')
+            .select(`
+              followers_count,
+              following_count,
+              posts_count,
+              likes_count,
+              views_count,
+              engagement_rate,
+              recorded_at
+            `)
+            .eq('account_id', account.id)
+            .order('recorded_at', { ascending: false })
+            .limit(1);
+
+          return {
+            ...account,
+            social_media_stats: statsData || []
+          };
+        })
+      );
+
+      setAccounts(accountsWithStats || []);
     } catch (error) {
       console.error('Error loading social accounts:', error);
       toast({

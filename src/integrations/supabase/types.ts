@@ -410,73 +410,11 @@ export type Database = {
             referencedRelation: "social_media_accounts"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "social_media_stats_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "social_media_accounts_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
     Views: {
-      social_media_accounts_safe: {
-        Row: {
-          connected_at: string | null
-          created_at: string | null
-          creator_id: string | null
-          display_name: string | null
-          id: string | null
-          is_active: boolean | null
-          last_synced_at: string | null
-          platform: string | null
-          platform_user_id: string | null
-          profile_image_url: string | null
-          token_expires_at: string | null
-          updated_at: string | null
-          username: string | null
-        }
-        Insert: {
-          connected_at?: string | null
-          created_at?: string | null
-          creator_id?: string | null
-          display_name?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          last_synced_at?: string | null
-          platform?: string | null
-          platform_user_id?: string | null
-          profile_image_url?: string | null
-          token_expires_at?: string | null
-          updated_at?: string | null
-          username?: string | null
-        }
-        Update: {
-          connected_at?: string | null
-          created_at?: string | null
-          creator_id?: string | null
-          display_name?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          last_synced_at?: string | null
-          platform?: string | null
-          platform_user_id?: string | null
-          profile_image_url?: string | null
-          token_expires_at?: string | null
-          updated_at?: string | null
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "social_media_accounts_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       decrypt_token: {
@@ -495,6 +433,24 @@ export type Database = {
         }[]
       }
       get_safe_social_media_accounts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          connected_at: string
+          created_at: string
+          creator_id: string
+          display_name: string
+          id: string
+          is_active: boolean
+          last_synced_at: string
+          platform: string
+          platform_user_id: string
+          profile_image_url: string
+          token_expires_at: string
+          updated_at: string
+          username: string
+        }[]
+      }
+      social_media_accounts_safe: {
         Args: Record<PropertyKey, never>
         Returns: {
           connected_at: string

@@ -70,9 +70,7 @@ export default function SocialMediaConnections() {
   const loadConnectedAccounts = async () => {
     try {
       const { data, error } = await supabase
-        .from('social_media_accounts_safe')
-        .select('*')
-        .eq('creator_id', user!.id)
+        .rpc('social_media_accounts_safe')
         .order('connected_at', { ascending: false });
 
       if (error) throw error;
