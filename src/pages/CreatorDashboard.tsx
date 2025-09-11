@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import SocialMediaStats from '@/components/SocialMediaStats';
 import { 
   Eye, 
   Send, 
@@ -209,6 +210,11 @@ export default function CreatorDashboard() {
               Back to Home
             </Button>
           </div>
+        </div>
+
+        {/* Social Media Statistics Section */}
+        <div className="mb-8">
+          <SocialMediaStats />
         </div>
 
         {/* Stats Overview */}

@@ -297,6 +297,121 @@ export type Database = {
         }
         Relationships: []
       }
+      social_media_accounts: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          created_at: string
+          creator_id: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          platform: string
+          platform_user_id: string
+          profile_image_url: string | null
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          created_at?: string
+          creator_id: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          platform: string
+          platform_user_id: string
+          profile_image_url?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          created_at?: string
+          creator_id?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          platform?: string
+          platform_user_id?: string
+          profile_image_url?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_accounts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_stats: {
+        Row: {
+          account_id: string
+          avg_comments_per_post: number | null
+          avg_likes_per_post: number | null
+          created_at: string
+          engagement_rate: number | null
+          followers_count: number | null
+          following_count: number | null
+          id: string
+          likes_count: number | null
+          posts_count: number | null
+          recorded_at: string
+          views_count: number | null
+        }
+        Insert: {
+          account_id: string
+          avg_comments_per_post?: number | null
+          avg_likes_per_post?: number | null
+          created_at?: string
+          engagement_rate?: number | null
+          followers_count?: number | null
+          following_count?: number | null
+          id?: string
+          likes_count?: number | null
+          posts_count?: number | null
+          recorded_at?: string
+          views_count?: number | null
+        }
+        Update: {
+          account_id?: string
+          avg_comments_per_post?: number | null
+          avg_likes_per_post?: number | null
+          created_at?: string
+          engagement_rate?: number | null
+          followers_count?: number | null
+          following_count?: number | null
+          id?: string
+          likes_count?: number | null
+          posts_count?: number | null
+          recorded_at?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_stats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
