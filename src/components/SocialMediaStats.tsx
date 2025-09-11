@@ -15,7 +15,9 @@ import {
   Eye,
   Plus,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  CheckCircle,
+  Unlink
 } from 'lucide-react';
 
 interface SocialAccount {
@@ -256,23 +258,29 @@ export default function SocialMediaStats() {
           const latestStats = account.social_media_stats?.[0];
           
           return (
-            <Card key={account.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="flex items-center space-x-2">
-                  <Icon className={`h-5 w-5 ${platformColors[account.platform as keyof typeof platformColors]}`} />
-                  <CardTitle className="text-sm font-medium capitalize">
-                    {account.platform}
-                  </CardTitle>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSyncStats(account.id, account.platform)}
-                  disabled={syncing === account.id}
-                >
-                  <RefreshCw className={`h-3 w-3 ${syncing === account.id ? 'animate-spin' : ''}`} />
-                </Button>
-              </CardHeader>
+             <Card key={account.id} className="hover:shadow-md transition-shadow border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-950/50">
+               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                 <div className="flex items-center space-x-2">
+                   <Icon className={`h-5 w-5 ${platformColors[account.platform as keyof typeof platformColors]}`} />
+                   <CardTitle className="text-sm font-medium capitalize">
+                     {account.platform}
+                   </CardTitle>
+                   <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                 </div>
+                 <div className="flex items-center space-x-2">
+                   <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                     Connected
+                   </Badge>
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleSyncStats(account.id, account.platform)}
+                     disabled={syncing === account.id}
+                   >
+                     <RefreshCw className={`h-3 w-3 ${syncing === account.id ? 'animate-spin' : ''}`} />
+                   </Button>
+                 </div>
+               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -320,26 +328,47 @@ export default function SocialMediaStats() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Object.entries(platformIcons).map(([platform, Icon]) => {
               const isConnected = accounts.some(acc => acc.platform === platform);
+              const connectedAccount = accounts.find(acc => acc.platform === platform);
               
               return (
-                <Button
-                  key={platform}
-                  variant={isConnected ? "secondary" : "outline"}
-                  className="h-20 flex-col space-y-2"
-                  onClick={() => !isConnected && handleConnectAccount(platform)}
-                  disabled={isConnected}
-                >
-                  <Icon className={`h-6 w-6 ${platformColors[platform as keyof typeof platformColors]}`} />
-                  <span className="capitalize text-xs">
-                    {isConnected ? 'Connected' : `Connect ${platform}`}
-                  </span>
+                <div key={platform} className="relative">
+                  <Button
+                    variant={isConnected ? "default" : "outline"}
+                    className={`h-20 flex-col space-y-2 w-full transition-all duration-200 ${
+                      isConnected 
+                        ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:border-green-800 dark:text-green-300 dark:hover:bg-green-900' 
+                        : 'hover:border-green-200 hover:bg-green-50/50'
+                    }`}
+                    onClick={() => !isConnected && handleConnectAccount(platform)}
+                    disabled={isConnected}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <Icon className={`h-6 w-6 ${platformColors[platform as keyof typeof platformColors]}`} />
+                      {isConnected && (
+                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      )}
+                    </div>
+                    <span className="capitalize text-xs font-medium">
+                      {isConnected ? 'Connected' : `Connect ${platform}`}
+                    </span>
+                    {isConnected && connectedAccount && (
+                      <div className="flex flex-col items-center space-y-1">
+                        <span className="text-xs text-muted-foreground">@{connectedAccount.username}</span>
+                        <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          <Users className="h-3 w-3 mr-1" />
+                          {formatNumber(connectedAccount.social_media_stats?.[0]?.followers_count || 0)}
+                        </Badge>
+                      </div>
+                    )}
+                  </Button>
                   {isConnected && (
-                    <Badge variant="outline" className="text-xs">
-                      <Users className="h-3 w-3 mr-1" />
-                      {formatNumber(accounts.find(acc => acc.platform === platform)?.social_media_stats?.[0]?.followers_count || 0)}
-                    </Badge>
+                    <div className="absolute -top-2 -right-2 z-10">
+                      <div className="bg-green-500 text-white rounded-full p-1 shadow-md">
+                        <CheckCircle className="h-4 w-4" />
+                      </div>
+                    </div>
                   )}
-                </Button>
+                </div>
               );
             })}
           </div>
