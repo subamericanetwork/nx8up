@@ -62,14 +62,14 @@ const Index = () => {
             </div>
             <div className="flex gap-4 items-center">
               {user && (
-                <span className="text-sm text-white">
+                <span className="text-sm text-blue-300">
                   Welcome back!
                 </span>
               )}
               <Button 
                 variant="ghost" 
                 onClick={handleAuthAction}
-                className="flex items-center gap-2 text-white hover:text-white/90"
+                className="flex items-center gap-2 text-blue-300 hover:text-blue-200"
               >
                 {user ? (
                   <>
