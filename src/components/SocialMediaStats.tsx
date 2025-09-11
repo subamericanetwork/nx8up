@@ -65,8 +65,55 @@ export default function SocialMediaStats() {
   useEffect(() => {
     if (user) {
       loadSocialAccounts();
+      
+      // Handle OAuth callback if present in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const platform = urlParams.get('platform');
+      const state = urlParams.get('state');
+      
+      if (code && platform) {
+        handleOAuthCallback(code, platform, state);
+      }
     }
   }, [user]);
+
+  const handleOAuthCallback = async (code: string, platform: string, state: string | null) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: {
+          action: 'callback',
+          platform: platform,
+          code: code,
+          state: state,
+          redirect_url: window.location.origin + '/creator-dashboard'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: 'Success!',
+          description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} account connected successfully!`,
+        });
+        
+        // Clear URL parameters and reload accounts
+        window.history.replaceState({}, document.title, window.location.pathname);
+        await loadSocialAccounts();
+      }
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      toast({
+        title: 'Connection Failed',
+        description: `Failed to connect ${platform} account. Please try again.`,
+        variant: 'destructive'
+      });
+      
+      // Clear URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  };
 
   const loadSocialAccounts = async () => {
     try {
@@ -114,12 +161,33 @@ export default function SocialMediaStats() {
     }
   };
 
-  const handleConnectAccount = (platform: string) => {
-    // This will trigger OAuth flow - for now show coming soon
-    toast({
-      title: 'Coming Soon',
-      description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} integration will be available soon!`,
-    });
+  const handleConnectAccount = async (platform: string) => {
+    try {
+      // Call OAuth function to get auth URL
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: {
+          action: 'connect',
+          platform: platform,
+          redirect_url: window.location.origin + '/creator-dashboard'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.auth_url) {
+        // Redirect to OAuth provider
+        window.location.href = data.auth_url;
+      } else {
+        throw new Error('No auth URL received');
+      }
+    } catch (error) {
+      console.error('Error connecting account:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to connect ${platform}. Please try again.`,
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleSyncStats = async (accountId: string, platform: string) => {
