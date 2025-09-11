@@ -98,7 +98,7 @@ const Index = () => {
             <h1 className="text-6xl font-bold mb-6 bg-brand-gradient bg-clip-text text-transparent">
               NX8UP
             </h1>
-            <p className="text-xl text-foreground/80 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl text-white mb-8 max-w-3xl mx-auto leading-relaxed">
               The first pooling system for nano/micro influencers. Brands buy creator pools, 
               not individual influencers. Performance-based payouts. Automated execution.
             </p>
