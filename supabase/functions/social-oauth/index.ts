@@ -193,7 +193,7 @@ serve(async (req) => {
         throw new Error('Invalid user token');
       }
 
-      // Store the connection in our database
+      // Store the connection in our database - first without tokens
       const socialAccountData = {
         creator_id: user.id,
         platform: platform,
@@ -201,8 +201,6 @@ serve(async (req) => {
         username: userInfo.login || userInfo.username || userInfo.data?.user?.username,
         display_name: userInfo.name || userInfo.display_name || userInfo.data?.user?.display_name,
         profile_image_url: userInfo.picture || userInfo.profile_image_url || userInfo.avatar_url,
-        access_token: tokenResponse.access_token,
-        refresh_token: tokenResponse.refresh_token,
         token_expires_at: tokenResponse.expires_in ? 
           new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString() : null,
         is_active: true,
@@ -222,12 +220,32 @@ serve(async (req) => {
         throw new Error('Failed to store account connection');
       }
 
+      // Now securely update the encrypted tokens using the secure function
+      const { error: tokenUpdateError } = await supabase
+        .rpc('update_encrypted_tokens', {
+          account_id: accountData.id,
+          new_access_token: tokenResponse.access_token,
+          new_refresh_token: tokenResponse.refresh_token
+        });
+
+      if (tokenUpdateError) {
+        console.error('Error updating encrypted tokens:', tokenUpdateError);
+        throw new Error('Failed to store tokens securely');
+      }
+
       console.log('Account stored successfully:', accountData.id);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
-          account: accountData,
+          account: {
+            id: accountData.id,
+            platform: accountData.platform,
+            username: accountData.username,
+            display_name: accountData.display_name,
+            profile_image_url: accountData.profile_image_url,
+            connected_at: accountData.connected_at
+          },
           message: `${platform} account connected successfully!`
         }),
         { 

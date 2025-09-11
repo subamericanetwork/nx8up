@@ -71,7 +71,7 @@ export default function SocialMediaStats() {
   const loadSocialAccounts = async () => {
     try {
       const { data, error } = await supabase
-        .from('social_media_accounts')
+        .from('social_media_accounts_safe')
         .select(`
           *,
           social_media_stats(

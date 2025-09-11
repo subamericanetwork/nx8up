@@ -22,7 +22,6 @@ interface SocialMediaAccount {
   is_active: boolean;
   connected_at: string;
   last_synced_at?: string;
-  access_token?: string;
 }
 
 const platformConfig = {
@@ -71,7 +70,7 @@ export default function SocialMediaConnections() {
   const loadConnectedAccounts = async () => {
     try {
       const { data, error } = await supabase
-        .from('social_media_accounts')
+        .from('social_media_accounts_safe')
         .select('*')
         .eq('creator_id', user!.id)
         .order('connected_at', { ascending: false });
