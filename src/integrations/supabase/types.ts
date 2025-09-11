@@ -450,6 +450,26 @@ export type Database = {
           username: string
         }[]
       }
+      get_social_account_with_tokens: {
+        Args: { account_id: string }
+        Returns: {
+          connected_at: string
+          created_at: string
+          creator_id: string
+          display_name: string
+          encrypted_access_token: string
+          encrypted_refresh_token: string
+          id: string
+          is_active: boolean
+          last_synced_at: string
+          platform: string
+          platform_user_id: string
+          profile_image_url: string
+          token_expires_at: string
+          updated_at: string
+          username: string
+        }[]
+      }
       social_media_accounts_safe: {
         Args: Record<PropertyKey, never>
         Returns: {

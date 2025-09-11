@@ -38,11 +38,9 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Account ID is required');
     }
 
-    // Get the social media account details
+    // Get the social media account details with tokens (service role access)
     const { data: account, error: accountError } = await supabase
-      .from('social_media_accounts')
-      .select('*')
-      .eq('id', accountId)
+      .rpc('get_social_account_with_tokens', { account_id: accountId })
       .single();
 
     if (accountError || !account) {
