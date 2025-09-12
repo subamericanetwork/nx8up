@@ -167,13 +167,27 @@ export default function OAuthCallback() {
           }
         });
 
-        console.log('📤 Edge function raw response:', { data, error });
-        console.log('📤 Response data details:', JSON.stringify(data, null, 2));
-        console.log('📤 Response error details:', JSON.stringify(error, null, 2));
+        console.log('📤 Edge function response:', { 
+          data, 
+          error, 
+          hasData: !!data,
+          hasError: !!error,
+          dataType: typeof data,
+          errorType: typeof error
+        });
 
         if (error) {
-          console.error('Supabase function error:', error);
-          throw new Error(error.message || 'OAuth completion failed');
+          console.error('❌ Supabase function error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            status: error.status,
+            statusText: error.statusText,
+            stack: error.stack,
+            name: error.name
+          });
+          throw error;
         }
 
         if (data?.error) {

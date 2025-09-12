@@ -103,6 +103,30 @@ serve(async (req) => {
       });
     }
 
+    // ============= TEST ACTION =============  
+    if (body.test) {
+      console.log(`[${requestId}] Test endpoint called`);
+      const envCheck = {
+        hasGoogleClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+        hasGoogleClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
+        hasYouTubeApiKey: !!Deno.env.get('YOUTUBE_API_KEY'),
+        hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+        hasSupabaseServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+        functionDeployed: true,
+        timestamp: new Date().toISOString(),
+        requestId
+      };
+      
+      console.log(`[${requestId}] Environment check:`, envCheck);
+      
+      return new Response(JSON.stringify({ 
+        message: 'Edge function test successful',
+        environment: envCheck
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // ============= CONNECT ACTION =============
     if (action === 'connect') {
       console.log(`[${requestId}] Processing connect request for ${platform}`);
