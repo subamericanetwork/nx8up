@@ -39,14 +39,30 @@ serve(async (req) => {
     let body;
     try {
       const bodyText = await req.text();
-      console.log('Raw body:', bodyText);
+      console.log('Raw body received:', bodyText);
+      console.log('Body length:', bodyText?.length || 0);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        console.log('ERROR: Empty request body received');
+        return new Response(JSON.stringify({ 
+          error: 'Empty request body - no data received',
+          method: req.method,
+          url: req.url
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
       body = JSON.parse(bodyText);
-      console.log('Parsed body:', JSON.stringify(body, null, 2));
+      console.log('Successfully parsed body:', JSON.stringify(body, null, 2));
     } catch (e) {
       console.log('Error parsing body:', e.message);
+      console.log('Error stack:', e.stack);
       return new Response(JSON.stringify({ 
         error: 'Invalid JSON body',
-        details: e.message 
+        details: e.message,
+        receivedData: req.body ? 'body exists' : 'no body'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
