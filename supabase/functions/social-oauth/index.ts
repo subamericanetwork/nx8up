@@ -50,10 +50,17 @@ serve(async (req) => {
 
     console.log(`[${requestId}] Extracted parameters:`, {
       action: action || 'MISSING',
-      platform: platform || 'MISSING',
+      platform: platform || 'MISSING', 
       hasCode: !!code,
       codeLength: code?.length || 0,
-      redirect_url: redirect_url || 'MISSING'
+      redirect_url: redirect_url || 'MISSING',
+      bodyKeys: Object.keys(body),
+      bodyValues: Object.keys(body).reduce((acc, key) => {
+        acc[key] = typeof body[key] === 'string' && body[key].length > 50 
+          ? `${body[key].substring(0, 20)}...` 
+          : body[key];
+        return acc;
+      }, {} as any)
     });
 
     // Validate required fields

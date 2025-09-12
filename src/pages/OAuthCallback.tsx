@@ -40,7 +40,10 @@ export default function OAuthCallback() {
         error: errorParam, 
         platform,
         codeLength: code?.length || 0,
-        actualCode: code ? `${code.substring(0, 10)}...${code.substring(code.length - 10)}` : 'MISSING'
+        actualCode: code ? `${code.substring(0, 10)}...${code.substring(code.length - 10)}` : 'MISSING',
+        fullState: state,
+        currentURL: window.location.href,
+        searchString: window.location.search
       });
 
       if (errorParam) {
@@ -154,13 +157,22 @@ export default function OAuthCallback() {
         });
 
         console.log('🔄 About to call social-oauth edge function...');
+        console.log('🔍 Full request payload:', {
+          action: 'callback',
+          platform,
+          code: code ? `${code.substring(0, 15)}...${code.substring(code.length - 15)}` : 'MISSING',
+          redirect_url: 'https://nx8up.lovable.app/creator-dashboard',
+          codeLength: code?.length,
+          platformType: typeof platform,
+          codeType: typeof code
+        });
         
         const { data, error } = await supabase.functions.invoke('social-oauth', {
           body: {
             action: 'callback',
             platform,
             code,
-            redirect_url: 'https://nx8up.lovable.app/oauth/callback'
+            redirect_url: 'https://nx8up.lovable.app/creator-dashboard'
           }
         });
 
