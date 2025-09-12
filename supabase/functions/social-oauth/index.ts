@@ -238,16 +238,42 @@ serve(async (req) => {
       });
 
       console.log(`[${requestId}] Token response status: ${tokenResponse.status}`);
+      console.log(`[${requestId}] Token response headers:`, Object.fromEntries(tokenResponse.headers.entries()));
       
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
         console.error(`[${requestId}] Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+        
+        // Parse the error response for more details
+        let errorDetails;
+        try {
+          errorDetails = JSON.parse(errorText);
+          console.error(`[${requestId}] Parsed error details:`, errorDetails);
+        } catch (e) {
+          console.error(`[${requestId}] Could not parse error response as JSON`);
+          errorDetails = { raw_error: errorText };
+        }
+        
         return new Response(JSON.stringify({ 
           error: 'Token exchange failed',
-          details: errorText,
+          details: errorDetails,
           status: tokenResponse.status,
           step: 'token_exchange',
-          requestId: requestId
+          requestId: requestId,
+          // Add debugging info without exposing secrets
+          debug: {
+            hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+            hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
+            clientIdPrefix: Deno.env.get('GOOGLE_CLIENT_ID')?.substring(0, 10) + '...',
+            secretPrefix: Deno.env.get('GOOGLE_CLIENT_SECRET')?.substring(0, 10) + '...',
+            codeLength: code?.length || 0,
+            redirectUri: callbackRedirectUri
+          }
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
