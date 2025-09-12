@@ -82,7 +82,7 @@ export default function OAuthCallback() {
             action: 'callback',
             platform,
             code,
-            redirect_url: `${window.location.origin}/oauth/callback`
+            redirect_url: 'https://nx8up.lovable.app/oauth/callback'
           }
           // Removed Authorization header since JWT verification is disabled
         });
