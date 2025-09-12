@@ -106,12 +106,24 @@ export default function OAuthCallback() {
         if (window.opener) {
           try {
             console.log('Sending success message to parent window...');
-            window.opener.postMessage({
+            // Try multiple methods for cross-origin communication
+            const message = {
               type: 'OAUTH_CALLBACK',
               success: true,
               account: data.account,
               platform
-            }, '*'); // Use '*' for cross-origin messaging
+            };
+            
+            // Method 1: Direct postMessage with wildcard origin
+            window.opener.postMessage(message, '*');
+            
+            // Method 2: Try with specific origin if available
+            try {
+              const parentOrigin = document.referrer ? new URL(document.referrer).origin : 'https://nx8up.lovable.app';
+              window.opener.postMessage(message, parentOrigin);
+            } catch (originError) {
+              console.log('Fallback origin message failed:', originError);
+            }
             
             // Close the popup after a brief delay
             setTimeout(() => {
@@ -147,11 +159,21 @@ export default function OAuthCallback() {
         if (window.opener) {
           try {
             console.log('Sending error message to parent window...');
-            window.opener.postMessage({
+            const errorMessage = {
               type: 'OAUTH_CALLBACK',
               error: err.message || 'Failed to complete OAuth',
               platform
-            }, '*'); // Use '*' for cross-origin messaging
+            };
+            
+            // Try multiple methods for cross-origin communication
+            window.opener.postMessage(errorMessage, '*');
+            
+            try {
+              const parentOrigin = document.referrer ? new URL(document.referrer).origin : 'https://nx8up.lovable.app';
+              window.opener.postMessage(errorMessage, parentOrigin);
+            } catch (originError) {
+              console.log('Fallback origin message failed:', originError);
+            }
             
             setTimeout(() => {
               try {

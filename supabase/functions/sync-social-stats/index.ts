@@ -47,11 +47,16 @@ const handler = async (req: Request): Promise<Response> => {
       .select('*')
       .eq('id', accountId)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
     
-    if (accountError || !accountData) {
+    if (accountError) {
       console.error('Failed to fetch social account:', accountError);
-      throw new Error(`Social media account not found: ${accountError?.message}`);
+      throw new Error(`Database error: ${accountError.message}`);
+    }
+    
+    if (!accountData) {
+      console.error('Social media account not found or inactive:', accountId);
+      throw new Error('Social media account not found or inactive');
     }
     
     const account = accountData; // Direct object, not array
@@ -173,7 +178,7 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     console.log('Token retrieval result:', { 
       success: !!tokenData, 
       error: tokenError?.message,
-      hasTokenData: !!tokenData
+      hasTokenData: !!tokenData && tokenData.length > 0
     });
     
     if (tokenError) {
@@ -182,12 +187,14 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     }
     
     if (!tokenData || tokenData.length === 0) {
-      throw new Error('No access token found for this account');
+      console.error('No token data returned from secure function');
+      throw new Error('No access token found for this account. Please reconnect your YouTube account.');
     }
     
     const accessToken = tokenData[0]?.access_token;
     if (!accessToken || accessToken.trim() === '') {
-      throw new Error('Access token is empty after decryption');
+      console.error('Access token is empty after decryption');
+      throw new Error('Access token is empty. Please reconnect your YouTube account.');
     }
     
     console.log('Successfully retrieved decrypted access token for YouTube API');

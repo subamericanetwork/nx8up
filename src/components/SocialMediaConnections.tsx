@@ -152,6 +152,7 @@ export default function SocialMediaConnections() {
         const messageListener = (event: MessageEvent) => {
           console.log('Received message from popup:', event.data, 'from origin:', event.origin);
           
+          // Accept messages from any origin for cross-origin compatibility
           if (event.data?.type === 'OAUTH_CALLBACK') {
             const { success, error, account, platform: callbackPlatform } = event.data;
             
@@ -173,7 +174,7 @@ export default function SocialMediaConnections() {
               console.log('OAuth success via message:', account);
               toast({
                 title: 'Connected Successfully!',
-                description: `Your ${account.platform} account has been connected`,
+                description: `Your ${account.platform || callbackPlatform || platform} account has been connected`,
               });
               setConnecting(null);
               // Refresh accounts list
