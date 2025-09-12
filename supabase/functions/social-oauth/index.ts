@@ -93,23 +93,36 @@ const getUserInfo = async (platform: string, accessToken: string): Promise<any> 
   switch (platform) {
     case 'youtube':
       // First get user info, then get channel info
+      console.log('=== YOUTUBE API CALLS ===');
       userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
+      console.log('Fetching user info from:', userInfoUrl);
+      
       const userInfoResponse = await fetch(userInfoUrl, { headers });
+      console.log('User info response status:', userInfoResponse.status);
       
       if (!userInfoResponse.ok) {
+        const errorText = await userInfoResponse.text();
+        console.error('User info fetch failed:', userInfoResponse.status, errorText);
         throw new Error(`Failed to fetch user info: ${userInfoResponse.statusText}`);
       }
       
       const userInfo = await userInfoResponse.json();
+      console.log('User info response:', JSON.stringify(userInfo, null, 2));
       
       // Now get YouTube channel info
       const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&access_token=${accessToken}`;
+      console.log('Fetching channel info from:', channelUrl);
+      
       const channelResponse = await fetch(channelUrl);
+      console.log('Channel response status:', channelResponse.status);
       
       if (channelResponse.ok) {
         const channelData = await channelResponse.json();
+        console.log('Channel data response:', JSON.stringify(channelData, null, 2));
+        
         if (channelData.items && channelData.items.length > 0) {
           const channel = channelData.items[0];
+          console.log('Using channel data for account info');
           // Combine user info with channel info
           return {
             ...userInfo,
@@ -120,14 +133,21 @@ const getUserInfo = async (platform: string, accessToken: string): Promise<any> 
             subscriber_count: channel.statistics?.subscriberCount || 0,
             video_count: channel.statistics?.videoCount || 0
           };
+        } else {
+          console.log('No channel items found in response');
         }
+      } else {
+        const errorText = await channelResponse.text();
+        console.error('Channel fetch failed:', channelResponse.status, errorText);
       }
       
       // Fallback to user info if channel fetch fails
+      console.log('Using fallback user info for account');
       return {
         ...userInfo,
-        username: userInfo.name || userInfo.email,
-        display_name: userInfo.name
+        id: userInfo.id, // Explicitly preserve the ID
+        username: userInfo.name || userInfo.email?.split('@')[0] || 'user',
+        display_name: userInfo.name || 'User'
       };
       
     case 'instagram':
@@ -252,7 +272,8 @@ serve(async (req) => {
       // Get user information
       console.log('Fetching user information from platform API...');
       const userInfo = await getUserInfo(platform, tokenResponse.access_token);
-      console.log('User info retrieved for platform:', platform, 'User ID:', userInfo.id || userInfo.data?.user?.id);
+      console.log('Raw user info from API:', JSON.stringify(userInfo, null, 2));
+      console.log('User info retrieved for platform:', platform, 'User ID available:', !!(userInfo?.id));
 
       // Get the current user from the auth header
       console.log('Validating user authentication...');
@@ -279,12 +300,22 @@ serve(async (req) => {
       
       let platformUserId, username, displayName, profileImageUrl;
       
+      console.log('Processing user info for platform:', platform);
+      console.log('Available userInfo fields:', Object.keys(userInfo || {}));
+      
       if (platform === 'youtube') {
         // For YouTube, we get combined user info with channel data
-        platformUserId = userInfo.id; // This should be the channel ID
-        username = userInfo.username || userInfo.display_name || userInfo.name || userInfo.email?.split('@')[0] || 'Unknown';
-        displayName = userInfo.display_name || userInfo.name || 'YouTube Channel';
-        profileImageUrl = userInfo.profile_image_url || userInfo.picture;
+        platformUserId = userInfo?.id;
+        username = userInfo?.username || userInfo?.display_name || userInfo?.name || userInfo?.email?.split('@')[0] || 'Unknown';
+        displayName = userInfo?.display_name || userInfo?.name || 'YouTube Channel';  
+        profileImageUrl = userInfo?.profile_image_url || userInfo?.picture;
+        
+        console.log('YouTube user extraction:', {
+          platformUserId,
+          username,
+          displayName,
+          profileImageUrl: !!profileImageUrl
+        });
       } else {
         // For other platforms
         platformUserId = userInfo.id || userInfo.data?.user?.id;
