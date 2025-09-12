@@ -280,10 +280,10 @@ serve(async (req) => {
       let platformUserId, username, displayName, profileImageUrl;
       
       if (platform === 'youtube') {
-        // For YouTube, we need to extract from the channel data
-        platformUserId = userInfo.id; // Channel ID is returned as 'id'
-        username = userInfo.username || userInfo.display_name || userInfo.name || userInfo.email?.split('@')[0];
-        displayName = userInfo.display_name || userInfo.name;
+        // For YouTube, we get combined user info with channel data
+        platformUserId = userInfo.id; // This should be the channel ID
+        username = userInfo.username || userInfo.display_name || userInfo.name || userInfo.email?.split('@')[0] || 'Unknown';
+        displayName = userInfo.display_name || userInfo.name || 'YouTube Channel';
         profileImageUrl = userInfo.profile_image_url || userInfo.picture;
       } else {
         // For other platforms
@@ -291,6 +291,21 @@ serve(async (req) => {
         username = userInfo.login || userInfo.username || userInfo.data?.user?.username;
         displayName = userInfo.name || userInfo.display_name || userInfo.data?.user?.display_name;
         profileImageUrl = userInfo.picture || userInfo.profile_image_url || userInfo.avatar_url;
+      }
+
+      // Validate required fields before proceeding
+      if (!platformUserId) {
+        console.error('Missing platform user ID from API response:', {
+          platform,
+          userInfo_keys: Object.keys(userInfo || {}),
+          userInfo: JSON.stringify(userInfo || {}).substring(0, 500)
+        });
+        throw new Error('Unable to extract user ID from platform API response');
+      }
+
+      if (!username) {
+        console.warn('Missing username, using fallback');
+        username = `${platform}_user_${platformUserId.substring(0, 8)}`;
       }
 
       const socialAccountData = {
@@ -306,13 +321,15 @@ serve(async (req) => {
         connected_at: new Date().toISOString()
       };
 
-      console.log('Social account data:', {
+      console.log('Social account data validation:', {
         creator_id: socialAccountData.creator_id,
         platform: socialAccountData.platform,
         platform_user_id: platformUserId,
         username: username,
         display_name: displayName,
-        has_required_fields: !!(platformUserId && username)
+        has_required_fields: !!(platformUserId && username),
+        userInfo_keys: Object.keys(userInfo || {}),
+        userInfo_sample: JSON.stringify(userInfo || {}).substring(0, 200)
       });
 
       console.log('Storing social account in database...');
