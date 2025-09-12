@@ -427,19 +427,32 @@ serve(async (req) => {
         
         console.log(`[${requestId}] Token details for storage:`, {
           hasAccessToken: !!tokens.access_token,
+          accessTokenLength: tokens.access_token?.length || 0,
           hasRefreshToken: !!tokens.refresh_token,
+          refreshTokenLength: tokens.refresh_token?.length || 0,
           expiresIn: tokens.expires_in,
-          calculatedExpiresAt: expiresAt?.toISOString()
+          calculatedExpiresAt: expiresAt?.toISOString(),
+          accountId: account.id
         });
         
+        // Test the RPC call exists first
+        console.log(`[${requestId}] Testing RPC function availability...`);
+        const { error: testError } = await supabase.rpc('secure_token_validation');
+        if (testError) {
+          console.log(`[${requestId}] RPC test failed:`, testError);
+          throw new Error(`RPC functions not available: ${testError.message}`);
+        }
+        
         console.log(`[${requestId}] Calling secure token update function with account_id: ${account.id}...`);
-        const { error: tokenUpdateError } = await supabase
+        const { data: rpcResult, error: tokenUpdateError } = await supabase
           .rpc('secure_update_social_tokens', {
             account_id: account.id,
             new_access_token: tokens.access_token,
             new_refresh_token: tokens.refresh_token || null,
             new_expires_at: expiresAt?.toISOString() || null
           });
+
+        console.log(`[${requestId}] RPC result:`, { data: rpcResult, error: tokenUpdateError });
 
         if (tokenUpdateError) {
           console.log(`[${requestId}] Secure token update failed:`, JSON.stringify(tokenUpdateError, null, 2));
@@ -449,6 +462,11 @@ serve(async (req) => {
         console.log(`[${requestId}] Step 5 completed: Tokens stored securely using service role function`);
       } catch (tokenErr) {
         console.error(`[${requestId}] Token storage error:`, tokenErr);
+        console.log(`[${requestId}] Full token error details:`, {
+          name: tokenErr.name,
+          message: tokenErr.message,
+          stack: tokenErr.stack
+        });
         
         // Delete the account if token storage fails since it's unusable
         await supabase
