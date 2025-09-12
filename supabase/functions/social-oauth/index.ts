@@ -60,6 +60,7 @@ serve(async (req) => {
 
       // Step 1: Exchange code for tokens
       console.log(`[${requestId}] Step 1: Exchanging authorization code for tokens`);
+      console.log(`[${requestId}] Using redirect_uri: ${redirect_url}`);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -69,7 +70,7 @@ serve(async (req) => {
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
           code: code,
           grant_type: 'authorization_code',
-          redirect_uri: 'https://nx8up.lovable.app/oauth/callback'
+          redirect_uri: redirect_url // Use the same redirect_uri that was used in the initial OAuth request
         })
       });
 
