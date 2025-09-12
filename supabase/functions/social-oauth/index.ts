@@ -383,35 +383,53 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 4 completed: Account created - ${account.id}`);
 
-      // Step 5: Store encrypted tokens using secure token function
+      // Step 5: Store encrypted tokens securely
       console.log(`[${requestId}] Step 5: Storing encrypted tokens securely`);
       
       try {
-        // Direct token update using service role access
-        console.log(`[${requestId}] Updating tokens directly with service role...`);
-        const { error: tokenError } = await supabase
-          .rpc('update_encrypted_tokens', { 
-            account_id: account.id,
-            new_access_token: tokens.access_token,
-            new_refresh_token: tokens.refresh_token || null
-          });
-
-        if (tokenError) {
-          console.log(`[${requestId}] Direct token update failed: ${tokenError.message}`);
-          throw new Error(`Failed to store access tokens: ${tokenError.message}`);
+        // Use direct table update with service role client (bypassing RPC security issues)
+        console.log(`[${requestId}] Encrypting and storing tokens directly...`);
+        
+        // Call encryption functions directly and update the table
+        const { data: encryptedAccessToken, error: encAccessError } = await supabase
+          .rpc('encrypt_token', { token: tokens.access_token });
+          
+        if (encAccessError) {
+          console.log(`[${requestId}] Access token encryption failed: ${encAccessError.message}`);
+          throw new Error(`Failed to encrypt access token: ${encAccessError.message}`);
+        }
+        
+        let encryptedRefreshToken = null;
+        if (tokens.refresh_token) {
+          const { data: encRefreshData, error: encRefreshError } = await supabase
+            .rpc('encrypt_token', { token: tokens.refresh_token });
+            
+          if (encRefreshError) {
+            console.log(`[${requestId}] Refresh token encryption failed: ${encRefreshError.message}`);
+            throw new Error(`Failed to encrypt refresh token: ${encRefreshError.message}`);
+          }
+          encryptedRefreshToken = encRefreshData;
         }
 
-        // Update token expiration separately if provided
+        // Update the account with encrypted tokens using service role client
+        const updateData = {
+          encrypted_access_token: encryptedAccessToken,
+          encrypted_refresh_token: encryptedRefreshToken,
+          updated_at: new Date().toISOString()
+        };
+        
         if (tokens.expires_in) {
-          const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-          const { error: expirationError } = await supabase
-            .from('social_media_accounts')
-            .update({ token_expires_at: expiresAt })
-            .eq('id', account.id);
-            
-          if (expirationError) {
-            console.log(`[${requestId}] Token expiration update failed: ${expirationError.message}`);
-          }
+          updateData.token_expires_at = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+        }
+        
+        const { error: updateError } = await supabase
+          .from('social_media_accounts')
+          .update(updateData)
+          .eq('id', account.id);
+
+        if (updateError) {
+          console.log(`[${requestId}] Token update failed: ${updateError.message}`);
+          throw new Error(`Failed to store encrypted tokens: ${updateError.message}`);
         }
         
         console.log(`[${requestId}] Step 5 completed: Tokens stored successfully`);
