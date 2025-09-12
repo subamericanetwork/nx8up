@@ -144,13 +144,57 @@ export default function SocialMediaConnections() {
           throw new Error('Popup blocked. Please allow popups for this site and try again.');
         }
         
-        // Monitor popup for completion
+        // Monitor popup for completion and OAuth callback
         const checkClosed = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(checkClosed);
-            setConnecting(null);
-            // Refresh accounts to see if connection was successful
-            setTimeout(() => loadConnectedAccounts(), 1000);
+          try {
+            // Check if popup is closed
+            if (popup.closed) {
+              clearInterval(checkClosed);
+              setConnecting(null);
+              // Refresh accounts to see if connection was successful
+              setTimeout(() => loadConnectedAccounts(), 1000);
+              return;
+            }
+
+            // Try to access popup URL to detect callback
+            try {
+              const popupUrl = popup.location.href;
+              const urlParams = new URLSearchParams(new URL(popupUrl).search);
+              const code = urlParams.get('code');
+              const error = urlParams.get('error');
+              
+              if (code || error) {
+                // OAuth callback detected - process it
+                clearInterval(checkClosed);
+                popup.close();
+                
+                if (error) {
+                  console.error('OAuth error in popup:', error);
+                  toast({
+                    title: 'Connection Failed',
+                    description: 'OAuth authorization was denied or failed',
+                    variant: 'destructive'
+                  });
+                  setConnecting(null);
+                  return;
+                }
+
+                if (code) {
+                  console.log('OAuth code received, processing callback...');
+                  // Process the OAuth callback
+                  handleOAuthCallback(platform, code);
+                }
+              }
+            } catch (e) {
+              // Cross-origin error - popup is still on OAuth provider's domain
+              // This is expected, continue monitoring
+            }
+          } catch (error) {
+            // If we can't access the popup, it might be closed
+            if (popup.closed) {
+              clearInterval(checkClosed);
+              setConnecting(null);
+            }
           }
         }, 1000);
         
@@ -172,6 +216,51 @@ export default function SocialMediaConnections() {
   // Reload accounts when needed (called from parent component after OAuth success)
   const refreshAccounts = async () => {
     await loadConnectedAccounts();
+  };
+
+  const handleOAuthCallback = async (platform: string, code: string) => {
+    try {
+      console.log('Processing OAuth callback for platform:', platform);
+      
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: { 
+          action: 'callback',
+          platform,
+          code,
+          redirect_url: `${window.location.origin}/creator-dashboard`
+        }
+      });
+
+      if (error) {
+        console.error('OAuth callback error:', error);
+        throw error;
+      }
+
+      if (!data?.success) {
+        console.error('OAuth callback failed:', data);
+        throw new Error(data?.error || 'Connection failed');
+      }
+
+      console.log('OAuth callback successful:', data);
+      
+      toast({
+        title: 'Connected Successfully!',
+        description: `Your ${platform} account has been connected`,
+      });
+
+      // Refresh the accounts list
+      setTimeout(() => loadConnectedAccounts(), 1000);
+
+    } catch (error) {
+      console.error('OAuth callback processing error:', error);
+      toast({
+        title: 'Connection Failed',
+        description: `Failed to connect ${platform} account: ${error.message || 'Please try again.'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setConnecting(null);
+    }
   };
 
   const handleDisconnect = async (accountId: string, platform: string) => {
