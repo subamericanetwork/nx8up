@@ -16,6 +16,12 @@ serve(async (req) => {
   console.log(`[${requestId}] Request URL: ${req.url}`);
   console.log(`[${requestId}] Request headers:`, Object.fromEntries(req.headers.entries()));
   
+  // Create service role client at the beginning
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') || '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  );
+  
   try {
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
@@ -311,11 +317,6 @@ serve(async (req) => {
       // Step 3: Get user from session or fallback method (JWT verification disabled)
       console.log(`[${requestId}] Step 3: Getting authenticated user`);
       
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') || '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-      );
-
       let user = null;
       
       // Try to get user from auth header if provided
