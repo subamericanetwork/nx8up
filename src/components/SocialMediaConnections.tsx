@@ -219,15 +219,36 @@ export default function SocialMediaConnections() {
           }
         };
         
-        // Start polling for localStorage result
+        // Start polling for localStorage result (primary method)
+        console.log('🔄 OAUTH PARENT: Starting localStorage polling...');
         const pollInterval = setInterval(() => {
-          if (pollForResult()) {
+          const result = pollForResult();
+          if (result) {
+            console.log('✅ OAUTH PARENT: Found result via localStorage, processing...');
+            handleOAuthResult(result);
             clearInterval(pollInterval);
           }
         }, 1000);
         
+        // Also listen for storage events
+        const storageListener = (event: StorageEvent) => {
+          if (event.key === 'oauth_result' && event.newValue) {
+            console.log('✅ OAUTH PARENT: Storage event detected for oauth_result');
+            try {
+              const parsed = JSON.parse(event.newValue);
+              handleOAuthResult(parsed);
+              clearInterval(pollInterval);
+            } catch (e) {
+              console.error('❌ OAUTH PARENT: Error parsing storage event data:', e);
+            }
+          }
+        };
+        
+        window.addEventListener('storage', storageListener);
+        
         // Cleanup function
         const cleanup = () => {
+          console.log('🧹 OAUTH PARENT: Cleaning up OAuth listeners and intervals');
           if (checkClosed) {
             clearInterval(checkClosed);
           }
@@ -235,12 +256,13 @@ export default function SocialMediaConnections() {
             clearInterval(pollInterval);
           }
           window.removeEventListener('message', messageListener);
+          window.removeEventListener('storage', storageListener);
           try {
             if (!popup.closed) {
               popup.close();
             }
           } catch (e) {
-            console.log('Popup already closed');
+            console.log('⚠️ OAUTH PARENT: Popup already closed or inaccessible');
           }
         };
         

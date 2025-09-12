@@ -76,41 +76,61 @@ export default function OAuthCallback() {
 
     // Helper function to send messages to parent
     const sendMessageToParent = (message: any) => {
-      console.log('Sending message to parent:', message);
+      console.log('🔄 OAUTH CALLBACK: Sending message to parent:', message);
       
-      // Always use localStorage as primary communication method
+      // Primary method: localStorage (bypasses COOP restrictions)
       const oauthResult = {
         ...message,
         timestamp: Date.now(),
-        platform: message.platform
+        platform: message.platform,
+        url: window.location.href
       };
       
       try {
         localStorage.setItem('oauth_result', JSON.stringify(oauthResult));
-        console.log('OAuth result stored in localStorage:', oauthResult);
+        console.log('✅ OAUTH CALLBACK: Result stored in localStorage:', oauthResult);
+        
+        // Also try to trigger a storage event manually
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'oauth_result',
+          newValue: JSON.stringify(oauthResult),
+          url: window.location.href
+        }));
+        console.log('✅ OAUTH CALLBACK: Storage event dispatched');
       } catch (e) {
-        console.error('Failed to store OAuth result in localStorage:', e);
+        console.error('❌ OAUTH CALLBACK: Failed to store OAuth result in localStorage:', e);
       }
       
-      // Try postMessage as backup
+      // Backup method: Try postMessage (will likely fail due to COOP)
       if (window.opener && !window.opener.closed) {
         try {
           window.opener.postMessage(message, '*');
-          console.log('Message also sent via postMessage');
+          console.log('✅ OAUTH CALLBACK: PostMessage sent (backup method)');
         } catch (e) {
-          console.log('PostMessage failed (expected due to COOP):', e.message);
+          console.log('⚠️ OAUTH CALLBACK: PostMessage failed as expected due to COOP:', e.message);
         }
+      } else {
+        console.log('⚠️ OAUTH CALLBACK: No opener window available');
       }
       
-      // Close popup or redirect after short delay
+      // Show success message to user in popup
+      if (message.success) {
+        setStatus('success');
+      } else {
+        setStatus('error');
+        setError(message.error || 'OAuth failed');
+      }
+      
+      // Close popup after delay
       setTimeout(() => {
+        console.log('🔄 OAUTH CALLBACK: Attempting to close popup window');
         try {
           window.close();
         } catch (closeError) {
-          console.log('Cannot close popup, redirecting:', closeError.message);
+          console.log('⚠️ OAUTH CALLBACK: Cannot close popup, redirecting:', closeError.message);
           window.location.href = '/creator-dashboard';
         }
-      }, 1000);
+      }, 2000); // Increased delay for user to see success message
     };
 
     // Complete the OAuth flow by calling the edge function
