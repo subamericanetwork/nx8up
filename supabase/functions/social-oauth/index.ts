@@ -267,6 +267,13 @@ serve(async (req) => {
       );
       
       console.log('Calling update_encrypted_tokens with account_id:', savedAccount.id);
+      console.log('Token data available:', {
+        hasAccessToken: !!tokenData.access_token,
+        hasRefreshToken: !!tokenData.refresh_token,
+        accessTokenLength: tokenData.access_token?.length,
+        refreshTokenLength: tokenData.refresh_token?.length
+      });
+      
       const { error: tokenError } = await serviceRoleSupabase.rpc('update_encrypted_tokens', {
         account_id: savedAccount.id,
         new_access_token: tokenData.access_token,
@@ -320,11 +327,14 @@ serve(async (req) => {
   } catch (error) {
     console.log('=== FUNCTION ERROR ===');
     console.log('Error type:', typeof error);
+    console.log('Error name:', error?.name);
     console.log('Error message:', error?.message);
     console.log('Error stack:', error?.stack);
+    console.log('Error object:', JSON.stringify(error, null, 2));
     
     return new Response(JSON.stringify({ 
       error: error?.message || 'Unknown error occurred',
+      errorType: error?.name || 'UnknownError',
       timestamp: new Date().toISOString()
     }), {
       status: 500,
