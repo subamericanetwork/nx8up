@@ -425,17 +425,24 @@ serve(async (req) => {
         const expiresAt = tokens.expires_in ? 
           new Date(Date.now() + (tokens.expires_in * 1000)) : null;
         
-        console.log(`[${requestId}] Calling secure token update function...`);
+        console.log(`[${requestId}] Token details for storage:`, {
+          hasAccessToken: !!tokens.access_token,
+          hasRefreshToken: !!tokens.refresh_token,
+          expiresIn: tokens.expires_in,
+          calculatedExpiresAt: expiresAt?.toISOString()
+        });
+        
+        console.log(`[${requestId}] Calling secure token update function with account_id: ${account.id}...`);
         const { error: tokenUpdateError } = await supabase
           .rpc('secure_update_social_tokens', {
             account_id: account.id,
             new_access_token: tokens.access_token,
             new_refresh_token: tokens.refresh_token || null,
-            new_expires_at: expiresAt?.toISOString() || null
+            new_expires_at: expiresAt
           });
 
         if (tokenUpdateError) {
-          console.log(`[${requestId}] Secure token update failed:`, tokenUpdateError);
+          console.log(`[${requestId}] Secure token update failed:`, JSON.stringify(tokenUpdateError, null, 2));
           throw new Error(`Failed to store tokens securely: ${tokenUpdateError.message}`);
         }
         
