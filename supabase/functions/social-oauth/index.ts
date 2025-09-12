@@ -153,7 +153,12 @@ serve(async (req) => {
       }
 
       const tokens = await tokenResponse.json();
-      console.log(`[${requestId}] Step 1 completed: Tokens received`);
+      console.log(`[${requestId}] Step 1 completed: Tokens received`, {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+        tokenType: tokens.token_type
+      });
 
       // Step 2: Get YouTube channel
       console.log(`[${requestId}] Step 2: Getting YouTube channel info`);
@@ -184,12 +189,20 @@ serve(async (req) => {
       }
 
       const channelData = await channelResponse.json();
+      console.log(`[${requestId}] YouTube API response data:`, {
+        hasItems: !!channelData.items,
+        itemsCount: channelData.items?.length || 0,
+        error: channelData.error,
+        quotaExceeded: channelData.error?.errors?.[0]?.reason === 'quotaExceeded'
+      });
       
       if (!channelData.items?.length) {
-        console.log(`[${requestId}] No YouTube channel found`);
+        console.log(`[${requestId}] No YouTube channel found - Response:`, JSON.stringify(channelData, null, 2));
         return new Response(JSON.stringify({ 
           error: 'No YouTube channel found',
-          step: 'channel_validation'
+          details: channelData.error || 'No channel data returned from YouTube API',
+          step: 'channel_validation',
+          requestId: requestId
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -415,9 +428,12 @@ serve(async (req) => {
       requestId: requestId,
       details: {
         name: error.name,
-        stack: error.stack?.split('\n')[0] // First line of stack trace
+        stack: error.stack?.split('\n')[0], // First line of stack trace
+        originalError: error.toString()
       }
     };
+    
+    console.error(`[${requestId}] Sending error response:`, JSON.stringify(errorResponse, null, 2));
     
     return new Response(JSON.stringify(errorResponse), {
       status: 500,
