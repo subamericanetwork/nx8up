@@ -274,11 +274,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
 
       const tokens = await tokenResponse.json();
       console.log(`[${requestId}] Step 1 completed: Tokens received`, {
