@@ -267,13 +267,30 @@ serve(async (req) => {
 
       // Store the connection in our database - first without tokens
       console.log('Preparing social account data for database...');
+      
+      let platformUserId, username, displayName, profileImageUrl;
+      
+      if (platform === 'youtube') {
+        // For YouTube, we need to extract from the channel data
+        platformUserId = userInfo.channelId || userInfo.id;
+        username = userInfo.channelTitle || userInfo.name || userInfo.given_name;
+        displayName = userInfo.channelTitle || userInfo.name;
+        profileImageUrl = userInfo.channelThumbnail || userInfo.picture;
+      } else {
+        // For other platforms
+        platformUserId = userInfo.id || userInfo.data?.user?.id;
+        username = userInfo.login || userInfo.username || userInfo.data?.user?.username;
+        displayName = userInfo.name || userInfo.display_name || userInfo.data?.user?.display_name;
+        profileImageUrl = userInfo.picture || userInfo.profile_image_url || userInfo.avatar_url;
+      }
+
       const socialAccountData = {
         creator_id: user.id,
         platform: platform,
-        platform_user_id: userInfo.id || userInfo.data?.user?.id,
-        username: userInfo.login || userInfo.username || userInfo.data?.user?.username,
-        display_name: userInfo.name || userInfo.display_name || userInfo.data?.user?.display_name,
-        profile_image_url: userInfo.picture || userInfo.profile_image_url || userInfo.avatar_url,
+        platform_user_id: platformUserId,
+        username: username,
+        display_name: displayName,
+        profile_image_url: profileImageUrl,
         token_expires_at: tokenResponse.expires_in ? 
           new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString() : null,
         is_active: true,
@@ -283,9 +300,10 @@ serve(async (req) => {
       console.log('Social account data:', {
         creator_id: socialAccountData.creator_id,
         platform: socialAccountData.platform,
-        platform_user_id: socialAccountData.platform_user_id,
-        username: socialAccountData.username,
-        display_name: socialAccountData.display_name
+        platform_user_id: platformUserId,
+        username: username,
+        display_name: displayName,
+        has_required_fields: !!(platformUserId && username)
       });
 
       console.log('Storing social account in database...');
