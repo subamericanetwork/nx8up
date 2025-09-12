@@ -30,14 +30,17 @@ export default function OAuthCallback() {
       if (state && state.includes('|')) {
         const parts = state.split('|');
         platform = parts[1] || 'youtube';
-        console.log('Extracted platform from state:', platform);
+        console.log('✅ Extracted platform from state:', platform);
+      } else {
+        console.log('⚠️ No state parameter or invalid format, using default platform:', platform);
       }
 
-      console.log('OAuth callback page loaded:', { 
+      console.log('📋 OAuth callback parameters:', { 
         hasCode: !!code, 
         error: errorParam, 
         platform,
-        codeLength: code?.length || 0
+        codeLength: code?.length || 0,
+        actualCode: code ? `${code.substring(0, 10)}...${code.substring(code.length - 10)}` : 'MISSING'
       });
 
       if (errorParam) {
