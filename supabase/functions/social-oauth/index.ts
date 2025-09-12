@@ -291,10 +291,13 @@ serve(async (req) => {
       console.log('Account saved successfully:', savedAccount.id);
 
       console.log('Step 6: Saving tokens securely...');
+      console.log('Environment check - SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
+      console.log('Environment check - SUPABASE_SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+      
       // Create service role client for secure token operations
       const serviceRoleSupabase = createClient(
         Deno.env.get('SUPABASE_URL') || '',
-        Deno.env.get('SERVICE_ROLE_KEY') || '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
         {
           auth: {
             autoRefreshToken: false,
@@ -303,6 +306,7 @@ serve(async (req) => {
         }
       );
       
+      console.log('Calling update_encrypted_tokens with account_id:', savedAccount.id);
       const { error: tokenError } = await serviceRoleSupabase.rpc('update_encrypted_tokens', {
         account_id: savedAccount.id,
         new_access_token: tokenData.access_token,
@@ -310,7 +314,20 @@ serve(async (req) => {
       });
 
       if (tokenError) {
-        console.log('Token save warning:', tokenError.message);
+        console.log('Token save error details:', {
+          message: tokenError.message,
+          code: tokenError.code,
+          details: tokenError.details,
+          hint: tokenError.hint
+        });
+        
+        // Return error if token saving fails
+        return new Response(JSON.stringify({ 
+          error: `Failed to save tokens: ${tokenError.message}` 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       } else {
         console.log('Tokens saved securely');
       }
