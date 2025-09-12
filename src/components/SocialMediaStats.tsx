@@ -157,7 +157,7 @@ export default function SocialMediaStats() {
         body: {
           action: 'connect',
           platform: platform,
-          redirect_url: window.location.origin + '/creator-dashboard'
+          redirect_url: window.location.origin + '/oauth/callback'
         }
       });
 
