@@ -100,7 +100,7 @@ serve(async (req) => {
       const state = crypto.randomUUID();
       authUrl.searchParams.set('client_id', clientId!);
       authUrl.searchParams.set('redirect_uri', redirectUrl);
-      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile');
+      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/userinfo.profile');
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('state', `${state}|${platform}`);
 
