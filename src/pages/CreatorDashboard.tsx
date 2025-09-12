@@ -168,10 +168,12 @@ export default function CreatorDashboard() {
       // Clean up URL and reload dashboard data
       window.history.replaceState({}, document.title, '/creator-dashboard');
       
-      // Force a complete refresh to ensure all components see the new data
+      // Refresh social media stats component
       setTimeout(() => {
-        window.location.reload();
-      }, 500);
+        if ((window as any).refreshSocialMediaStats) {
+          (window as any).refreshSocialMediaStats();
+        }
+      }, 1000);
       
     } catch (error) {
       console.error('OAuth callback error:', error);
