@@ -165,27 +165,27 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get decrypted tokens directly using the service role client
-    console.log('Attempting to decrypt access token...');
-    const { data: accessTokenResult, error: accessTokenError } = await supabase
-      .rpc('decrypt_token', { encrypted_token: account.encrypted_access_token });
+    // Get decrypted tokens using secure function
+    console.log('Getting secure social tokens...');
+    const { data: tokenData, error: tokenError } = await supabase
+      .rpc('get_secure_social_tokens', { account_id: account.id });
     
-    console.log('Token decryption result:', { 
-      success: !!accessTokenResult, 
-      error: accessTokenError?.message,
-      hasEncryptedToken: !!account.encrypted_access_token 
+    console.log('Token retrieval result:', { 
+      success: !!tokenData, 
+      error: tokenError?.message,
+      hasTokenData: !!tokenData
     });
     
-    if (accessTokenError) {
-      console.error('Token decryption error:', accessTokenError);
-      throw new Error(`Could not decrypt access token: ${accessTokenError.message}`);
+    if (tokenError) {
+      console.error('Token retrieval error:', tokenError);
+      throw new Error(`Could not retrieve access token: ${tokenError.message}`);
     }
     
-    if (!accessTokenResult) {
-      throw new Error('No access token returned from decryption');
+    if (!tokenData || tokenData.length === 0) {
+      throw new Error('No access token found for this account');
     }
     
-    const accessToken = accessTokenResult;
+    const accessToken = tokenData[0]?.access_token;
     if (!accessToken || accessToken.trim() === '') {
       throw new Error('Access token is empty after decryption');
     }
