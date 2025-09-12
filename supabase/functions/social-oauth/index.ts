@@ -159,16 +159,193 @@ serve(async (req) => {
       console.log(`[${requestId}] STEP 3: All validations passed - proceeding with callback...`);
       
       try {
-        console.log(`[${requestId}] === STARTING MINIMAL CALLBACK TEST ===`);
+        console.log(`[${requestId}] === STARTING CALLBACK PROCESSING ===`);
         
-        // Just return success for now to test
-        console.log(`[${requestId}] Returning test success response`);
+        // Initialize Supabase client with service role
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL') || '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+        );
         
+        console.log(`[${requestId}] Supabase client initialized`);
+
+        // Exchange authorization code for tokens
+        console.log(`[${requestId}] === EXCHANGING CODE FOR TOKENS ===`);
+        const tokenUrl = 'https://oauth2.googleapis.com/token';
+        const tokenData = new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: 'https://nx8up.lovable.app/oauth/callback'
+        });
+
+        const tokenResponse = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: tokenData,
+        });
+
+        console.log(`[${requestId}] Token response status:`, tokenResponse.status);
+        
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          console.log(`[${requestId}] Token exchange failed:`, errorText);
+          return new Response(JSON.stringify({ 
+            error: 'Token exchange failed',
+            details: errorText,
+            status: tokenResponse.status
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const tokens = await tokenResponse.json();
+        console.log(`[${requestId}] === TOKENS RECEIVED SUCCESSFULLY ===`);
+
+        // Get YouTube channel info
+        console.log(`[${requestId}] === GETTING YOUTUBE CHANNEL INFO ===`);
+        const channelResponse = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+          },
+        });
+
+        console.log(`[${requestId}] Channel response status:`, channelResponse.status);
+
+        if (!channelResponse.ok) {
+          const errorText = await channelResponse.text();
+          console.log(`[${requestId}] Channel API failed:`, errorText);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to get YouTube channel info',
+            details: errorText,
+            status: channelResponse.status
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const channelData = await channelResponse.json();
+        
+        if (!channelData.items || channelData.items.length === 0) {
+          console.log(`[${requestId}] No YouTube channel found`);
+          return new Response(JSON.stringify({ 
+            error: 'No YouTube channel found for this account',
+            details: 'The authenticated Google account does not have an associated YouTube channel'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const channel = channelData.items[0];
+        console.log(`[${requestId}] Channel found:`, channel.snippet.title);
+
+        // Get user ID from authorization header
+        console.log(`[${requestId}] === VALIDATING USER AUTHORIZATION ===`);
+        const authHeader = req.headers.get('authorization');
+        
+        if (!authHeader) {
+          console.log(`[${requestId}] No auth header provided`);
+          return new Response(JSON.stringify({ 
+            error: 'Authorization required' 
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+
+        if (userError || !user) {
+          console.log(`[${requestId}] User validation failed:`, userError?.message);
+          return new Response(JSON.stringify({ 
+            error: 'Invalid user token',
+            details: userError?.message
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`[${requestId}] User validated:`, user.id);
+
+        // Create social media account WITHOUT encrypted tokens first
+        console.log(`[${requestId}] === CREATING SOCIAL MEDIA ACCOUNT ===`);
+        
+        const username = channel.snippet.customUrl || channel.snippet.title || `channel-${channel.id}`;
+        const displayName = channel.snippet.title || 'YouTube Channel';
+
+        const { data: account, error: accountError } = await supabase
+          .from('social_media_accounts')
+          .upsert({
+            creator_id: user.id,
+            platform: 'youtube',
+            platform_user_id: channel.id,
+            username: username,
+            display_name: displayName,
+            profile_image_url: channel.snippet.thumbnails?.default?.url,
+            is_active: true,
+            connected_at: new Date().toISOString(),
+            token_expires_at: tokens.expires_in ? 
+              new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+            // Note: NOT including encrypted tokens in initial insert
+          }, {
+            onConflict: 'creator_id,platform',
+            ignoreDuplicates: false
+          })
+          .select()
+          .single();
+
+        if (accountError) {
+          console.log(`[${requestId}] Account creation failed:`, accountError.message);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to create social media account',
+            details: accountError.message,
+            code: accountError.code
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`[${requestId}] Account created successfully:`, account.id);
+
+        // Store encrypted tokens using secure function
+        console.log(`[${requestId}] === STORING ENCRYPTED TOKENS ===`);
+        const { error: tokenError } = await supabase.rpc('update_encrypted_tokens', {
+          account_id: account.id,
+          new_access_token: tokens.access_token,
+          new_refresh_token: tokens.refresh_token || null
+        });
+
+        if (tokenError) {
+          console.log(`[${requestId}] Token storage failed:`, tokenError.message);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to store tokens',
+            details: tokenError.message
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`[${requestId}] === OAUTH CALLBACK COMPLETED SUCCESSFULLY ===`);
+
         return new Response(JSON.stringify({ 
           success: true,
-          message: 'Test callback completed successfully',
-          test_mode: true,
-          request_id: requestId
+          message: 'YouTube account connected successfully',
+          account: {
+            platform: account.platform,
+            username: account.username,
+            display_name: account.display_name
+          }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
