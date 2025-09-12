@@ -150,6 +150,8 @@ export default function OAuthCallback() {
           codeLength: code.length
         });
 
+        console.log('🔄 About to call social-oauth edge function...');
+        
         const { data, error } = await supabase.functions.invoke('social-oauth', {
           body: {
             action: 'callback',
@@ -159,7 +161,9 @@ export default function OAuthCallback() {
           }
         });
 
-        console.log('Edge function response:', { data, error });
+        console.log('📤 Edge function raw response:', { data, error });
+        console.log('📤 Response data details:', JSON.stringify(data, null, 2));
+        console.log('📤 Response error details:', JSON.stringify(error, null, 2));
 
         if (error) {
           console.error('Supabase function error:', error);
