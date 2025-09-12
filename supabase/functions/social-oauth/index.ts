@@ -109,30 +109,43 @@ serve(async (req) => {
 
       // Step 1: Exchange code for tokens
       console.log(`[${requestId}] Step 1: Exchanging authorization code for tokens`);
+      console.log(`[${requestId}] Environment check:`, {
+        hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+        hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
+        clientIdLength: Deno.env.get('GOOGLE_CLIENT_ID')?.length || 0
+      });
       
       // CRITICAL: Use the same redirect URI that was used in the initial OAuth request
       const callbackRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
       console.log(`[${requestId}] Using consistent redirect_uri: ${callbackRedirectUri}`);
       
+      const tokenRequestBody = new URLSearchParams({
+        client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
+        client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: callbackRedirectUri
+      });
+      
+      console.log(`[${requestId}] Token request body keys:`, Array.from(tokenRequestBody.keys()));
+      
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
-          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-          code: code,
-          grant_type: 'authorization_code',
-          redirect_uri: callbackRedirectUri // Use the same redirect_uri that was used in the initial OAuth request
-        })
+        body: tokenRequestBody
       });
 
+      console.log(`[${requestId}] Token response status: ${tokenResponse.status}`);
+      
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
-        console.log(`[${requestId}] Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+        console.error(`[${requestId}] Token exchange failed: ${tokenResponse.status} - ${errorText}`);
         return new Response(JSON.stringify({ 
           error: 'Token exchange failed',
           details: errorText,
-          step: 'token_exchange'
+          status: tokenResponse.status,
+          step: 'token_exchange',
+          requestId: requestId
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -144,18 +157,26 @@ serve(async (req) => {
 
       // Step 2: Get YouTube channel
       console.log(`[${requestId}] Step 2: Getting YouTube channel info`);
+      console.log(`[${requestId}] Environment check for YouTube API:`, {
+        hasYouTubeApiKey: !!Deno.env.get('YOUTUBE_API_KEY'),
+        youTubeApiKeyLength: Deno.env.get('YOUTUBE_API_KEY')?.length || 0
+      });
       
-      const channelResponse = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
+      const channelResponse = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&key=${Deno.env.get('YOUTUBE_API_KEY')}`, {
         headers: { 'Authorization': `Bearer ${tokens.access_token}` }
       });
 
+      console.log(`[${requestId}] YouTube API response status: ${channelResponse.status}`);
+      
       if (!channelResponse.ok) {
         const errorText = await channelResponse.text();
-        console.log(`[${requestId}] YouTube API failed: ${channelResponse.status} - ${errorText}`);
+        console.error(`[${requestId}] YouTube API failed: ${channelResponse.status} - ${errorText}`);
         return new Response(JSON.stringify({ 
           error: 'Failed to get YouTube channel',
           details: errorText,
-          step: 'youtube_api'
+          status: channelResponse.status,
+          step: 'youtube_api',
+          requestId: requestId
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
