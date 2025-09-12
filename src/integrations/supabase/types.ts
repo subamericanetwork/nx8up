@@ -595,6 +595,10 @@ export type Database = {
           username: string
         }[]
       }
+      test_token_functions: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       update_encrypted_tokens: {
         Args: {
           account_id: string

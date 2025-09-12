@@ -422,35 +422,64 @@ serve(async (req) => {
       console.log(`[${requestId}] Step 5: Storing encrypted tokens securely`);
       
       try {
-        console.log(`[${requestId}] Using secure token update function...`);
-        console.log(`[${requestId}] Function parameters:`, {
-          account_id: account.id,
-          new_access_token: tokens.access_token ? `${tokens.access_token.substring(0, 10)}...` : null,
-          new_refresh_token: tokens.refresh_token ? `${tokens.refresh_token.substring(0, 10)}...` : null,
-          new_expires_at: tokens.expires_in ? 
-            new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
-        });
+        console.log(`[${requestId}] Testing database functions first...`);
         
-        // Use the secure token update function that bypasses RLS properly
-        const { data: updateResult, error: updateError } = await supabase
-          .rpc('secure_update_social_tokens', {
-            account_id: account.id,
-            new_access_token: tokens.access_token,
-            new_refresh_token: tokens.refresh_token || null,
-            new_expires_at: tokens.expires_in ? 
-              new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
-          });
-
-        if (updateError) {
-          console.log(`[${requestId}] Secure token update failed: ${updateError.message}`);
-          console.log(`[${requestId}] Error details:`, JSON.stringify(updateError, null, 2));
-          console.log(`[${requestId}] Error code: ${updateError.code}`);
-          console.log(`[${requestId}] Error hint: ${updateError.hint}`);
-          throw new Error(`Failed to store tokens securely: ${updateError.message}`);
+        // Test basic database connectivity
+        const { data: testResult, error: testError } = await supabase
+          .rpc('test_token_functions');
+          
+        if (testError) {
+          console.log(`[${requestId}] Database test failed:`, testError);
+        } else {
+          console.log(`[${requestId}] Database test passed:`, testResult);
         }
         
-        console.log(`[${requestId}] Step 5 completed: Tokens stored successfully via secure function`);
-        console.log(`[${requestId}] Update result:`, updateResult);
+        console.log(`[${requestId}] Using direct token encryption and storage...`);
+        
+        // Encrypt tokens directly using RPC calls
+        const { data: encryptedAccessToken, error: encAccessError } = await supabase
+          .rpc('encrypt_token', { token: tokens.access_token });
+          
+        if (encAccessError) {
+          console.log(`[${requestId}] Access token encryption failed:`, encAccessError);
+          throw new Error(`Failed to encrypt access token: ${encAccessError.message}`);
+        }
+        
+        let encryptedRefreshToken = null;
+        if (tokens.refresh_token) {
+          const { data: encRefreshData, error: encRefreshError } = await supabase
+            .rpc('encrypt_token', { token: tokens.refresh_token });
+            
+          if (encRefreshError) {
+            console.log(`[${requestId}] Refresh token encryption failed:`, encRefreshError);
+            throw new Error(`Failed to encrypt refresh token: ${encRefreshError.message}`);
+          }
+          encryptedRefreshToken = encRefreshData;
+        }
+
+        // Update the account directly with encrypted tokens
+        const updateData: any = {
+          encrypted_access_token: encryptedAccessToken,
+          encrypted_refresh_token: encryptedRefreshToken,
+          updated_at: new Date().toISOString()
+        };
+        
+        if (tokens.expires_in) {
+          updateData.token_expires_at = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+        }
+        
+        console.log(`[${requestId}] Updating account with encrypted tokens...`);
+        const { error: updateError } = await supabase
+          .from('social_media_accounts')
+          .update(updateData)
+          .eq('id', account.id);
+
+        if (updateError) {
+          console.log(`[${requestId}] Direct token update failed:`, updateError);
+          throw new Error(`Failed to store encrypted tokens: ${updateError.message}`);
+        }
+        
+        console.log(`[${requestId}] Step 5 completed: Tokens stored successfully via direct update`);
       } catch (tokenErr) {
         console.error(`[${requestId}] Token storage error:`, tokenErr);
         
