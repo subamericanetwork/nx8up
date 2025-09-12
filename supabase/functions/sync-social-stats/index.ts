@@ -28,25 +28,35 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('=== SYNC SOCIAL STATS FUNCTION CALLED ===');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { accountId }: SyncStatsRequest = await req.json();
+    console.log('Account ID received:', accountId);
     
     if (!accountId) {
       throw new Error('Account ID is required');
     }
 
+    console.log('Fetching social account with tokens...');
     // Get the social media account details with tokens (service role access)
     const { data: accountData, error: accountError } = await supabase
       .rpc('get_social_account_with_tokens', { account_id: accountId });
     
     if (accountError || !accountData || accountData.length === 0) {
-      throw new Error('Social media account not found');
+      console.error('Failed to fetch social account:', accountError);
+      throw new Error(`Social media account not found: ${accountError?.message}`);
     }
     
     const account = accountData[0]; // get_social_account_with_tokens returns an array
+    console.log('Social account found:', {
+      id: account.id,
+      platform: account.platform, 
+      username: account.username,
+      is_active: account.is_active
+    });
 
 
     console.log(`Syncing stats for ${account.platform} account: @${account.username}`);
@@ -54,6 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
     let stats: SocialStats;
 
     // Platform-specific stat fetching
+    console.log(`Calling platform-specific stats function for: ${account.platform}`);
     switch (account.platform) {
       case 'youtube':
         stats = await fetchYouTubeStats(account);
@@ -71,7 +82,10 @@ const handler = async (req: Request): Promise<Response> => {
         throw new Error(`Platform ${account.platform} not supported`);
     }
 
+    console.log('Stats fetched successfully:', stats);
+
     // Insert new stats record
+    console.log('Inserting stats into database...');
     const { error: statsError } = await supabase
       .from('social_media_stats')
       .insert({
@@ -84,7 +98,10 @@ const handler = async (req: Request): Promise<Response> => {
       throw statsError;
     }
 
+    console.log('Stats inserted successfully');
+
     // Update the last synced timestamp
+    console.log('Updating last synced timestamp...');
     const { error: updateError } = await supabase
       .from('social_media_accounts')
       .update({ 

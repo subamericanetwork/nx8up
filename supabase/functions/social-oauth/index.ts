@@ -218,39 +218,55 @@ serve(async (req) => {
       );
 
     } else if (action === 'callback') {
+      console.log('=== OAUTH CALLBACK PROCESSING ===');
+      console.log('Platform:', platform, 'Code provided:', !!code);
+      
       // Step 2: Handle OAuth callback
       if (!code) {
+        console.error('No authorization code provided in callback');
         throw new Error('Authorization code not provided');
       }
 
       const config = getOAuthConfig(platform, redirect_url);
       if (!config) {
+        console.error(`OAuth not configured for platform: ${platform}`);
         throw new Error(`OAuth not configured for ${platform}`);
       }
+      
+      console.log('OAuth config retrieved for platform:', platform);
 
       // Exchange code for access token
+      console.log('Exchanging authorization code for access token...');
       const tokenResponse = await exchangeCodeForToken(platform, code, config);
-      console.log('Token exchange successful for platform:', platform);
+      console.log('Token exchange successful for platform:', platform, 'Has access token:', !!tokenResponse.access_token);
 
       // Get user information
+      console.log('Fetching user information from platform API...');
       const userInfo = await getUserInfo(platform, tokenResponse.access_token);
-      console.log('User info retrieved for platform:', platform, userInfo);
+      console.log('User info retrieved for platform:', platform, 'User ID:', userInfo.id || userInfo.data?.user?.id);
 
       // Get the current user from the auth header
+      console.log('Validating user authentication...');
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
+        console.error('No Authorization header provided in callback');
         throw new Error('No authorization header provided');
       }
 
+      console.log('Auth header present, extracting user...');
       const { data: { user }, error: authError } = await supabase.auth.getUser(
         authHeader.replace('Bearer ', '')
       );
 
       if (authError || !user) {
+        console.error('User authentication failed:', authError);
         throw new Error('Invalid user token');
       }
+      
+      console.log('User authenticated successfully:', user.id);
 
       // Store the connection in our database - first without tokens
+      console.log('Preparing social account data for database...');
       const socialAccountData = {
         creator_id: user.id,
         platform: platform,
@@ -264,6 +280,15 @@ serve(async (req) => {
         connected_at: new Date().toISOString()
       };
 
+      console.log('Social account data:', {
+        creator_id: socialAccountData.creator_id,
+        platform: socialAccountData.platform,
+        platform_user_id: socialAccountData.platform_user_id,
+        username: socialAccountData.username,
+        display_name: socialAccountData.display_name
+      });
+
+      console.log('Storing social account in database...');
       const { data: accountData, error: accountError } = await supabase
         .from('social_media_accounts')
         .upsert(socialAccountData, {
@@ -273,9 +298,11 @@ serve(async (req) => {
         .single();
 
       if (accountError) {
-        console.error('Database error:', accountError);
-        throw new Error('Failed to store account connection');
+        console.error('Database error creating social account:', accountError);
+        throw new Error(`Failed to store account connection: ${accountError.message}`);
       }
+      
+      console.log('Social account stored successfully:', accountData.id);
 
       // Now securely update the encrypted tokens using the secure function
       const { error: tokenUpdateError } = await supabase
