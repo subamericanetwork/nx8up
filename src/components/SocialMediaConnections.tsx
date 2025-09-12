@@ -159,44 +159,68 @@ export default function SocialMediaConnections() {
             // Try to access popup URL to detect callback
             try {
               const popupUrl = popup.location.href;
-              const urlParams = new URLSearchParams(new URL(popupUrl).search);
-              const code = urlParams.get('code');
-              const error = urlParams.get('error');
+              console.log('Popup URL:', popupUrl);
               
-              if (code || error) {
-                // OAuth callback detected - process it
-                clearInterval(checkClosed);
-                popup.close();
+              // Check if we're back on our domain
+              if (popupUrl.includes(window.location.origin) || popupUrl.includes('lovable.app')) {
+                const urlParams = new URLSearchParams(new URL(popupUrl).search);
+                const code = urlParams.get('code');
+                const error = urlParams.get('error');
                 
-                if (error) {
-                  console.error('OAuth error in popup:', error);
-                  toast({
-                    title: 'Connection Failed',
-                    description: 'OAuth authorization was denied or failed',
-                    variant: 'destructive'
-                  });
-                  setConnecting(null);
-                  return;
-                }
+                console.log('Callback detected:', { code: !!code, error });
+                
+                if (code || error) {
+                  // OAuth callback detected - process it
+                  clearInterval(checkClosed);
+                  popup.close();
+                  
+                  if (error) {
+                    console.error('OAuth error in popup:', error);
+                    toast({
+                      title: 'Connection Failed',
+                      description: 'OAuth authorization was denied or failed',
+                      variant: 'destructive'
+                    });
+                    setConnecting(null);
+                    return;
+                  }
 
-                if (code) {
-                  console.log('OAuth code received, processing callback...');
-                  // Process the OAuth callback
-                  handleOAuthCallback(platform, code);
+                  if (code) {
+                    console.log('OAuth code received, processing callback...');
+                    // Process the OAuth callback
+                    handleOAuthCallback(platform, code);
+                  }
                 }
               }
             } catch (e) {
               // Cross-origin error - popup is still on OAuth provider's domain
               // This is expected, continue monitoring
+              console.log('Cross-origin access blocked (expected while on OAuth provider)');
             }
           } catch (error) {
             // If we can't access the popup, it might be closed
+            console.error('Error monitoring popup:', error);
             if (popup.closed) {
               clearInterval(checkClosed);
               setConnecting(null);
             }
           }
-        }, 1000);
+        }, 500); // Check more frequently
+
+        // Also add a timeout to prevent infinite waiting
+        setTimeout(() => {
+          if (!popup.closed) {
+            clearInterval(checkClosed);
+            popup.close();
+            setConnecting(null);
+            console.log('OAuth timeout - closing popup');
+            toast({
+              title: 'Connection Timeout',
+              description: 'The connection process took too long. Please try again.',
+              variant: 'destructive'
+            });
+          }
+        }, 300000); // 5 minute timeout
         
       } else {
         console.error('No auth URL in response:', data);
