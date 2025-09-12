@@ -161,8 +161,11 @@ export default function SocialMediaConnections() {
               const popupUrl = popup.location.href;
               console.log('Popup URL:', popupUrl);
               
-              // Check if we're back on our domain
-              if (popupUrl.includes(window.location.origin) || popupUrl.includes('lovable.app')) {
+              // Check if we're back on our domain (handle all Lovable domains)
+              if (popupUrl.includes(window.location.origin) || 
+                  popupUrl.includes('lovable.app') || 
+                  popupUrl.includes('lovable.dev') ||
+                  popupUrl.includes('sandbox.lovable.dev')) {
                 const urlParams = new URLSearchParams(new URL(popupUrl).search);
                 const code = urlParams.get('code');
                 const error = urlParams.get('error');
