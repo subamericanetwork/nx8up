@@ -169,9 +169,25 @@ serve(async (req) => {
       const username = channel.snippet.customUrl || channel.snippet.title || `channel-${channel.id}`;
       const displayName = channel.snippet.title || 'YouTube Channel';
 
+      // First, delete any existing account for this user/platform combination
+      console.log(`[${requestId}] Removing any existing account for user ${user.id} platform youtube`);
+      
+      const { error: deleteError } = await supabase
+        .from('social_media_accounts')
+        .delete()
+        .eq('creator_id', user.id)
+        .eq('platform', 'youtube');
+      
+      if (deleteError) {
+        console.log(`[${requestId}] Delete existing account error (non-critical):`, deleteError.message);
+      }
+
+      // Now insert the new account
+      console.log(`[${requestId}] Inserting new account`);
+      
       const { data: account, error: accountError } = await supabase
         .from('social_media_accounts')
-        .upsert({
+        .insert({
           creator_id: user.id,
           platform: 'youtube',
           platform_user_id: channel.id,
@@ -182,18 +198,18 @@ serve(async (req) => {
           connected_at: new Date().toISOString(),
           token_expires_at: tokens.expires_in ? 
             new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
-        }, {
-          onConflict: 'creator_id,platform',
-          ignoreDuplicates: false
         })
         .select()
         .single();
 
       if (accountError) {
         console.log(`[${requestId}] Account creation failed: ${accountError.message}`);
+        console.log(`[${requestId}] Account error details:`, JSON.stringify(accountError, null, 2));
         return new Response(JSON.stringify({ 
           error: 'Failed to create social media account',
           details: accountError.message,
+          code: accountError.code,
+          hint: accountError.hint,
           step: 'account_creation'
         }), {
           status: 400,
@@ -214,9 +230,11 @@ serve(async (req) => {
 
       if (tokenError) {
         console.log(`[${requestId}] Token storage failed: ${tokenError.message}`);
+        console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenError, null, 2));
         return new Response(JSON.stringify({ 
           error: 'Failed to store tokens',
           details: tokenError.message,
+          code: tokenError.code,
           step: 'token_storage'
         }), {
           status: 400,
