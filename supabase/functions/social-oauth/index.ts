@@ -281,10 +281,10 @@ serve(async (req) => {
       
       if (platform === 'youtube') {
         // For YouTube, we need to extract from the channel data
-        platformUserId = userInfo.channelId || userInfo.id;
-        username = userInfo.channelTitle || userInfo.name || userInfo.given_name;
-        displayName = userInfo.channelTitle || userInfo.name;
-        profileImageUrl = userInfo.channelThumbnail || userInfo.picture;
+        platformUserId = userInfo.id; // Channel ID is returned as 'id'
+        username = userInfo.username || userInfo.display_name || userInfo.name || userInfo.email?.split('@')[0];
+        displayName = userInfo.display_name || userInfo.name;
+        profileImageUrl = userInfo.profile_image_url || userInfo.picture;
       } else {
         // For other platforms
         platformUserId = userInfo.id || userInfo.data?.user?.id;
