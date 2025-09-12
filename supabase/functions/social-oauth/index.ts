@@ -418,34 +418,28 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 4 completed: Account created - ${account.id}`);
 
-      // Step 5: Store tokens securely (simplified approach)
-      console.log(`[${requestId}] Step 5: Storing tokens with simplified approach`);
+      // Step 5: Store tokens securely using secure function
+      console.log(`[${requestId}] Step 5: Storing tokens using secure service role function`);
       
       try {
-        // For now, store tokens as plain text to get the OAuth flow working
-        // TODO: Implement proper encryption later
-        const updateData: any = {
-          encrypted_access_token: tokens.access_token, // Store directly for now
-          encrypted_refresh_token: tokens.refresh_token || null,
-          updated_at: new Date().toISOString()
-        };
+        const expiresAt = tokens.expires_in ? 
+          new Date(Date.now() + (tokens.expires_in * 1000)) : null;
         
-        if (tokens.expires_in) {
-          updateData.token_expires_at = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-        }
-        
-        console.log(`[${requestId}] Updating account with tokens (temporary plain text storage)...`);
-        const { error: updateError } = await supabase
-          .from('social_media_accounts')
-          .update(updateData)
-          .eq('id', account.id);
+        console.log(`[${requestId}] Calling secure token update function...`);
+        const { error: tokenUpdateError } = await supabase
+          .rpc('secure_update_social_tokens', {
+            account_id: account.id,
+            new_access_token: tokens.access_token,
+            new_refresh_token: tokens.refresh_token || null,
+            new_expires_at: expiresAt?.toISOString() || null
+          });
 
-        if (updateError) {
-          console.log(`[${requestId}] Direct token update failed:`, updateError);
-          throw new Error(`Failed to store tokens: ${updateError.message}`);
+        if (tokenUpdateError) {
+          console.log(`[${requestId}] Secure token update failed:`, tokenUpdateError);
+          throw new Error(`Failed to store tokens securely: ${tokenUpdateError.message}`);
         }
         
-        console.log(`[${requestId}] Step 5 completed: Tokens stored successfully (plain text - temporary)`);
+        console.log(`[${requestId}] Step 5 completed: Tokens stored securely using service role function`);
       } catch (tokenErr) {
         console.error(`[${requestId}] Token storage error:`, tokenErr);
         
