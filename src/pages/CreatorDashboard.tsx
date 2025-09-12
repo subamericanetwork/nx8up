@@ -125,11 +125,18 @@ export default function CreatorDashboard() {
 
   const handleOAuthCallback = async (platform: string, code: string) => {
     try {
+      console.log('=== OAUTH CALLBACK STARTED ===');
+      console.log('Platform:', platform);
+      console.log('Code received:', !!code);
+      console.log('User ID:', user?.id);
+      console.log('Current URL:', window.location.href);
+
       toast({
         title: 'Processing Connection...',
         description: `Connecting your ${platform} account`,
       });
 
+      console.log('Invoking social-oauth function with callback action...');
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
           action: 'callback',
@@ -139,7 +146,19 @@ export default function CreatorDashboard() {
         }
       });
 
-      if (error) throw error;
+      console.log('Function response:', { data, error });
+
+      if (error) {
+        console.error('Function invocation error:', error);
+        throw error;
+      }
+
+      if (!data || !data.success) {
+        console.error('Function returned unsuccessful result:', data);
+        throw new Error(data?.error || 'Unknown error occurred');
+      }
+
+      console.log('OAuth callback completed successfully:', data);
 
       toast({
         title: 'Connected Successfully!',
@@ -158,7 +177,7 @@ export default function CreatorDashboard() {
       console.error('OAuth callback error:', error);
       toast({
         title: 'Connection Failed',
-        description: `Failed to connect ${platform} account. Please try again.`,
+        description: `Failed to connect ${platform} account: ${error.message || 'Please try again.'}`,
         variant: 'destructive'
       });
       
