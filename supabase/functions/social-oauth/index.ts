@@ -232,7 +232,19 @@ serve(async (req) => {
         connected_at: new Date().toISOString()
       };
 
-      const { data: savedAccount, error: dbError } = await supabase
+      // Use service role client for database operations (required by RLS policies)
+      const serviceRoleSupabase = createClient(
+        Deno.env.get('SUPABASE_URL') || '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
+
+      const { data: savedAccount, error: dbError } = await serviceRoleSupabase
         .from('social_media_accounts')
         .upsert(accountData, { onConflict: 'creator_id,platform' })
         .select()
@@ -263,18 +275,6 @@ serve(async (req) => {
       console.log('Step 6: Saving tokens securely...');
       console.log('Environment check - SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
       console.log('Environment check - SUPABASE_SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-      
-      // Create service role client for secure token operations
-      const serviceRoleSupabase = createClient(
-        Deno.env.get('SUPABASE_URL') || '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
       
       console.log('Calling update_encrypted_tokens with account_id:', savedAccount.id);
       console.log('Token data available:', {
