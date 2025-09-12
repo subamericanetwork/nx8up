@@ -100,14 +100,25 @@ export default function CreatorDashboard() {
 
   // Handle OAuth callback
   useEffect(() => {
-    if (!user) return;
+    console.log('=== CREATOR DASHBOARD OAUTH CHECK ===');
+    console.log('User exists:', !!user);
+    console.log('Current URL:', window.location.href);
+    console.log('URL search params:', window.location.search);
+    
+    if (!user) {
+      console.log('No user, skipping OAuth callback check');
+      return;
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const platform = urlParams.get('platform');
     const code = urlParams.get('code');
     const error = urlParams.get('error');
     
+    console.log('OAuth URL params:', { platform, code: !!code, error });
+    
     if (error) {
+      console.log('OAuth error detected:', error);
       toast({
         title: 'Connection Failed',
         description: 'OAuth authorization was denied or failed',
@@ -119,7 +130,10 @@ export default function CreatorDashboard() {
     }
     
     if (platform && code) {
+      console.log('OAuth callback detected, calling handleOAuthCallback...');
       handleOAuthCallback(platform, code);
+    } else {
+      console.log('No OAuth callback detected - missing platform or code');
     }
   }, [user, toast]);
 
