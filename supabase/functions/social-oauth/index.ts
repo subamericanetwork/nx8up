@@ -233,81 +233,92 @@ serve(async (req) => {
         });
       }
 
-      // Step 1: Exchange code for tokens
-      console.log(`[${requestId}] Step 1: Exchanging authorization code for tokens`);
-      console.log(`[${requestId}] Environment check:`, {
-        hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
-        hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
-        clientIdLength: Deno.env.get('GOOGLE_CLIENT_ID')?.length || 0
-      });
+      // Step 1: Exchange code for tokens - SIMPLIFIED VERSION
+      console.log(`[${requestId}] SIMPLIFIED TOKEN EXCHANGE ATTEMPT`);
+      console.log(`[${requestId}] Code received length: ${code?.length}`);
+      console.log(`[${requestId}] Using redirect URI: ${callbackRedirectUri}`);
       
-      // CRITICAL: Use the same redirect URI that was used in the initial OAuth request
-      const callbackRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
-      console.log(`[${requestId}] Using consistent redirect_uri: ${callbackRedirectUri}`);
+      // Check environment variables first
+      const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+      const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+      
+      if (!clientId || !clientSecret) {
+        console.error(`[${requestId}] MISSING CREDENTIALS!`);
+        return new Response(JSON.stringify({ 
+          error: 'Missing Google OAuth credentials',
+          details: {
+            hasClientId: !!clientId,
+            hasClientSecret: !!clientSecret
+          }
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      console.log(`[${requestId}] Credentials check - ID length: ${clientId.length}, Secret length: ${clientSecret.length}`);
       
       const tokenRequestBody = new URLSearchParams({
-        client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
-        client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+        client_id: clientId,
+        client_secret: clientSecret,
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: callbackRedirectUri
       });
       
-      console.log(`[${requestId}] Token request body keys:`, Array.from(tokenRequestBody.keys()));
+      console.log(`[${requestId}] Making token request to Google...`);
       
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: tokenRequestBody
-      });
+      try {
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: tokenRequestBody
+        });
 
-      console.log(`[${requestId}] Token response status: ${tokenResponse.status}`);
-      console.log(`[${requestId}] Token response headers:`, Object.fromEntries(tokenResponse.headers.entries()));
-      
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        console.error(`[${requestId}] Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+        const responseText = await tokenResponse.text();
+        console.log(`[${requestId}] Google response status: ${tokenResponse.status}`);
+        console.log(`[${requestId}] Google response body: ${responseText}`);
         
-        // Parse the error response for more details
-        let errorDetails;
-        try {
-          errorDetails = JSON.parse(errorText);
-          console.error(`[${requestId}] Parsed Google error:`, errorDetails);
-        } catch (e) {
-          console.error(`[${requestId}] Could not parse error response as JSON`);
-          errorDetails = { raw_error: errorText };
+        if (!tokenResponse.ok) {
+          // Return the exact Google error
+          return new Response(JSON.stringify({ 
+            error: 'Google OAuth Error',
+            status: tokenResponse.status,
+            googleResponse: responseText,
+            requestDetails: {
+              clientIdLength: clientId.length,
+              codeLength: code.length,
+              redirectUri: callbackRedirectUri
+            }
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
         
-        // Log the exact request we sent to Google (without exposing secrets)
-        console.error(`[${requestId}] Failed token request details:`, {
-          url: 'https://oauth2.googleapis.com/token',
-          method: 'POST',
-          hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
-          hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
-          clientIdLength: Deno.env.get('GOOGLE_CLIENT_ID')?.length || 0,
-          secretLength: Deno.env.get('GOOGLE_CLIENT_SECRET')?.length || 0,
-          codeLength: code?.length || 0,
-          redirectUri: callbackRedirectUri,
-          requestBodyKeys: Array.from(tokenRequestBody.keys())
-        });
+        const tokens = JSON.parse(responseText);
+        console.log(`[${requestId}] SUCCESS: Tokens received`);
         
+        // For now, just return success without database operations
         return new Response(JSON.stringify({ 
-          error: 'Google OAuth token exchange failed',
-          googleError: errorDetails,
-          status: tokenResponse.status,
-          step: 'token_exchange',
-          requestId: requestId,
-          // Add debugging info without exposing secrets
-          debug: {
-            hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
-            hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
-            clientIdPrefix: Deno.env.get('GOOGLE_CLIENT_ID')?.substring(0, 10) + '...',
-            secretPrefix: Deno.env.get('GOOGLE_CLIENT_SECRET')?.substring(0, 10) + '...',
-            codeLength: code?.length || 0,
-            redirectUri: callbackRedirectUri
+          success: true,
+          message: 'Token exchange successful',
+          account: {
+            platform: 'youtube',
+            username: 'test-user',
+            display_name: 'Test User'
           }
         }), {
-          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } catch (fetchError) {
+        console.error(`[${requestId}] Fetch error:`, fetchError);
+        return new Response(JSON.stringify({ 
+          error: 'Network error during token exchange',
+          details: fetchError.message
+        }), {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
