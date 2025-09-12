@@ -72,11 +72,15 @@ export default function OAuthCallback() {
           }
         });
 
+        console.log('Edge function response:', { data, error });
+
         if (error) {
+          console.error('Supabase function error:', error);
           throw new Error(error.message || 'OAuth completion failed');
         }
 
-        if (data.error) {
+        if (data?.error) {
+          console.error('Function returned error:', data.error);
           throw new Error(data.error);
         }
 

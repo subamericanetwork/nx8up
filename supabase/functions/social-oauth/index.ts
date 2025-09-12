@@ -11,11 +11,12 @@ serve(async (req) => {
   console.log('Method:', req.method, 'URL:', req.url);
   console.log('Timestamp:', new Date().toISOString());
   
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    console.log('Handling CORS OPTIONS request');
-    return new Response(null, { headers: corsHeaders });
-  }
+  try {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      console.log('Handling CORS OPTIONS request');
+      return new Response(null, { headers: corsHeaders });
+    }
 
   try {
     console.log('=== ENVIRONMENT CHECK ===');
