@@ -84,10 +84,8 @@ export default function OAuthCallback() {
             platform,
             code,
             redirect_url: `${window.location.origin}/oauth/callback`
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
           }
+          // Removed Authorization header since JWT verification is disabled
         });
 
         console.log('Edge function response:', { data, error });

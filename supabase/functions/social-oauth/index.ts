@@ -76,10 +76,31 @@ serve(async (req) => {
     // ============= CALLBACK ACTION =============
     if (action === 'callback') {
       console.log(`[${requestId}] Processing callback for ${platform} with code: ${!!code}`);
+      console.log(`[${requestId}] Callback validation:`, {
+        hasCode: !!code,
+        hasPlatform: !!platform,
+        hasRedirectUrl: !!redirect_url,
+        platform: platform,
+        codeLength: code?.length || 0
+      });
       
       if (!code) {
+        console.error(`[${requestId}] Missing authorization code`);
         return new Response(JSON.stringify({ 
-          error: 'No authorization code provided'
+          error: 'No authorization code provided',
+          requestId: requestId
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!platform || platform !== 'youtube') {
+        console.error(`[${requestId}] Invalid platform:`, platform);
+        return new Response(JSON.stringify({ 
+          error: 'Invalid platform. Only youtube is supported.',
+          platform: platform,
+          requestId: requestId
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
