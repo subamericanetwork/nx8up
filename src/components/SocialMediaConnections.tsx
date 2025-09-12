@@ -131,8 +131,29 @@ export default function SocialMediaConnections() {
       }
 
       if (data?.auth_url) {
-        console.log('Redirecting to auth URL:', data.auth_url);
-        window.location.href = data.auth_url;
+        console.log('Opening popup for auth URL:', data.auth_url);
+        
+        // Open popup window for OAuth
+        const popup = window.open(
+          data.auth_url,
+          'oauth-popup',
+          'width=600,height=700,scrollbars=yes,menubar=no,toolbar=no,location=no,status=no'
+        );
+        
+        if (!popup) {
+          throw new Error('Popup blocked. Please allow popups for this site and try again.');
+        }
+        
+        // Monitor popup for completion
+        const checkClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkClosed);
+            setConnecting(null);
+            // Refresh accounts to see if connection was successful
+            setTimeout(() => loadConnectedAccounts(), 1000);
+          }
+        }, 1000);
+        
       } else {
         console.error('No auth URL in response:', data);
         throw new Error('No authentication URL received');
