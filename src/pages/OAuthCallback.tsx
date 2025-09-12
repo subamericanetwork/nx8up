@@ -66,36 +66,69 @@ export default function OAuthCallback() {
 
     // Helper function to send messages to parent
     const sendMessageToParent = (message: any) => {
-      if (window.opener) {
+      if (window.opener && !window.opener.closed) {
         try {
           console.log('Sending message to parent:', message);
-          window.opener.postMessage(message, '*');
           
-          // Also try specific origins
-          const origins = ['https://nx8up.lovable.app', 'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev'];
+          // Try multiple origins for cross-origin compatibility
+          const origins = [
+            '*', // Wildcard first
+            'https://nx8up.lovable.app', 
+            'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev',
+            window.location.origin,
+            'http://localhost:8080',
+            'https://localhost:8080'
+          ];
+          
+          let messageSent = false;
           origins.forEach(origin => {
             try {
               window.opener.postMessage(message, origin);
+              messageSent = true;
+              console.log('Message sent to origin:', origin);
             } catch (e) {
-              console.log('Failed to send to origin:', origin);
+              console.log('Failed to send to origin:', origin, e.message);
             }
           });
           
+          if (!messageSent) {
+            console.error('Failed to send message to any origin');
+          }
+          
+          // Close window with better error handling
           setTimeout(() => {
             try {
-              window.close();
+              // Check if window can be closed
+              if (!window.opener.closed) {
+                console.log('Attempting to close popup window');
+                window.close();
+              }
             } catch (closeError) {
-              console.log('Could not close window, redirecting instead');
-              window.location.href = '/creator-dashboard';
+              console.log('Could not close window (cross-origin policy):', closeError.message);
+              // Try alternative method
+              try {
+                window.location.replace('/creator-dashboard');
+              } catch (replaceError) {
+                window.location.href = '/creator-dashboard';
+              }
             }
-          }, 1000);
+          }, 1500);
         } catch (postMessageError) {
           console.error('Failed to send message to parent:', postMessageError);
-          window.location.href = '/creator-dashboard';
+          // Fallback redirect
+          try {
+            window.location.replace('/creator-dashboard');
+          } catch (replaceError) {
+            window.location.href = '/creator-dashboard';
+          }
         }
       } else {
-        console.log('No window opener, redirecting to dashboard');
-        window.location.href = '/creator-dashboard';
+        console.log('No valid window opener, redirecting to dashboard');
+        try {
+          window.location.replace('/creator-dashboard');
+        } catch (replaceError) {
+          window.location.href = '/creator-dashboard';
+        }
       }
     };
 

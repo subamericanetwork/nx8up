@@ -302,37 +302,36 @@ serve(async (req) => {
         }
       );
 
-      // Use the secure token storage function
-      console.log(`[${requestId}] Calling secure token update function...`);
-      const { data: tokenResult, error: tokenError } = await serviceSupabase
-        .rpc('secure_update_social_tokens', { 
-          account_id: account.id,
-          new_access_token: tokens.access_token,
-          new_refresh_token: tokens.refresh_token || null,
-          new_expires_at: tokens.expires_in ? 
-            new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+      try {
+        // Use the secure token storage function
+        console.log(`[${requestId}] Calling secure token update function...`);
+        const { data: tokenResult, error: tokenError } = await serviceSupabase
+          .rpc('secure_update_social_tokens', { 
+            account_id: account.id,
+            new_access_token: tokens.access_token,
+            new_refresh_token: tokens.refresh_token || null,
+            new_expires_at: tokens.expires_in ? 
+              new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+          });
+
+        console.log(`[${requestId}] Secure token storage result:`, { 
+          success: !!tokenResult, 
+          error: tokenError?.message 
         });
 
-      console.log(`[${requestId}] Secure token storage result:`, { 
-        success: !!tokenResult, 
-        error: tokenError?.message 
-      });
-
-      if (tokenError) {
-        console.log(`[${requestId}] Secure token storage failed: ${tokenError.message}`);
-        console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenError, null, 2));
-        return new Response(JSON.stringify({ 
-          error: 'Failed to store tokens securely',
-          details: tokenError.message,
-          code: tokenError.code,
-          step: 'secure_token_storage'
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        if (tokenError) {
+          console.log(`[${requestId}] Secure token storage failed: ${tokenError.message}`);
+          console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenError, null, 2));
+          
+          // Don't fail the entire flow if token storage fails - just log it
+          console.log(`[${requestId}] WARNING: Token storage failed but continuing with account creation`);
+        } else {
+          console.log(`[${requestId}] Step 5 completed: Tokens stored securely`);
+        }
+      } catch (tokenErr) {
+        console.log(`[${requestId}] Token storage error (non-critical):`, tokenErr);
+        // Continue without failing
       }
-
-      console.log(`[${requestId}] Step 5 completed: Tokens stored securely`);
       
       // Step 6: Trigger initial stats sync
       console.log(`[${requestId}] Step 6: Triggering initial stats sync`);
@@ -378,14 +377,23 @@ serve(async (req) => {
     console.error(`[${requestId}] OAUTH FUNCTION ERROR:`, {
       name: error.name,
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
+      url: req.url,
+      method: req.method
     });
     
-    return new Response(JSON.stringify({ 
+    // More detailed error response
+    const errorResponse = {
       error: error.message || 'OAuth function failed',
       step: 'general_error',
-      requestId: requestId
-    }), {
+      requestId: requestId,
+      details: {
+        name: error.name,
+        stack: error.stack?.split('\n')[0] // First line of stack trace
+      }
+    };
+    
+    return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

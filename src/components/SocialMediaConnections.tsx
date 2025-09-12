@@ -200,10 +200,14 @@ export default function SocialMediaConnections() {
         
         window.addEventListener('message', messageListener);
         
-        // Simple popup monitoring - only check if closed
+        // Track when popup was opened for timeout calculations
+        const popupOpenTime = Date.now();
+        
+        // Simple popup monitoring with cross-origin protection
         const checkClosed = setInterval(() => {
           try {
-            if (popup.closed) {
+            // More robust popup closed check
+            if (popup.closed || popup.closed === undefined) {
               console.log('Popup was closed by user');
               cleanup();
               setConnecting(null);
@@ -212,11 +216,16 @@ export default function SocialMediaConnections() {
               return;
             }
           } catch (error) {
-            console.log('Error checking popup status:', error);
-            cleanup();
-            setConnecting(null);
+            console.log('Error checking popup status (cross-origin):', error.message);
+            // If we can't check popup status due to cross-origin, assume it might be closed
+            // Only cleanup if we haven't received a message in a while
+            if (Date.now() - popupOpenTime > 300000) { // 5 minutes
+              console.log('Popup check timeout - assuming closed');
+              cleanup();
+              setConnecting(null);
+            }
           }
-        }, 1000); // Check less frequently
+        }, 2000); // Check less frequently to reduce cross-origin errors
 
         // Add timeout to prevent infinite waiting
         setTimeout(() => {
