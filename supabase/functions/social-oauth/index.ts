@@ -18,22 +18,15 @@ serve(async (req) => {
       return new Response(null, { headers: corsHeaders });
     }
 
-  try {
     console.log('=== ENVIRONMENT CHECK ===');
-    const hasSupabaseUrl = !!Deno.env.get('SUPABASE_URL');
-    const hasServiceRole = !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');  
-    const hasGoogleClientId = !!Deno.env.get('GOOGLE_CLIENT_ID');
-    const hasGoogleSecret = !!Deno.env.get('GOOGLE_CLIENT_SECRET');
-    
-    console.log('SUPABASE_URL exists:', hasSupabaseUrl);
-    console.log('SERVICE_ROLE_KEY exists:', hasServiceRole);
-    console.log('GOOGLE_CLIENT_ID exists:', hasGoogleClientId);
-    console.log('GOOGLE_CLIENT_SECRET exists:', hasGoogleSecret);
-    
-    if (!hasGoogleClientId) {
-      console.log('ERROR: Missing GOOGLE_CLIENT_ID');
+    console.log('SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
+    console.log('GOOGLE_CLIENT_ID exists:', !!Deno.env.get('GOOGLE_CLIENT_ID'));
+    console.log('GOOGLE_CLIENT_SECRET exists:', !!Deno.env.get('GOOGLE_CLIENT_SECRET'));
+    console.log('SUPABASE_SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+
+    if (!Deno.env.get('GOOGLE_CLIENT_ID')) {
       return new Response(JSON.stringify({ 
-        error: 'Google Client ID not configured' 
+        error: 'GOOGLE_CLIENT_ID not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -42,105 +35,73 @@ serve(async (req) => {
 
     console.log('=== CREATING SUPABASE CLIENT ===');
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_ANON_KEY') || ''
     );
     console.log('Supabase client created successfully');
 
     console.log('=== READING REQUEST BODY ===');
-    let requestBody;
-    try {
-      const bodyText = await req.text();
-      console.log('Raw body text:', bodyText);
-      requestBody = JSON.parse(bodyText || '{}');
-      console.log('Parsed request body:', JSON.stringify(requestBody, null, 2));
-    } catch (parseError) {
-      console.log('Body parsing error:', parseError.message);
-      return new Response(JSON.stringify({ 
-        error: 'Invalid JSON in request body',
-        details: parseError.message 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const bodyText = await req.text();
+    console.log('Raw body text:', bodyText);
+    
+    const body = JSON.parse(bodyText);
+    console.log('Parsed request body:', body);
 
-    const { action, platform, code } = requestBody;
     console.log('=== EXTRACTED PARAMETERS ===');
+    const { action, platform, code, redirect_url } = body;
     console.log('action:', action);
     console.log('platform:', platform);
     console.log('code exists:', !!code);
-    console.log('code length:', code ? code.length : 0);
+    console.log('code length:', code?.length || 0);
 
-    if (!action || !platform) {
-      console.log('ERROR: Missing required parameters');
-      return new Response(JSON.stringify({ 
-        error: 'Missing required parameters: action and platform' 
-      }), {
-        status: 400,
+    console.log('=== DOMAIN DETECTION ===');
+    console.log('Requested redirect URL:', redirect_url);
+    const fallbackOrigin = 'https://nx8up.lovable.app';
+    console.log('Fallback origin:', fallbackOrigin);
+    const finalRedirectUrl = redirect_url || fallbackOrigin;
+    console.log('Final redirect URL:', finalRedirectUrl);
+
+    console.log('Using Google Client ID:', Deno.env.get('GOOGLE_CLIENT_ID')?.substring(0, 15) + '...');
+
+    // ============= CONNECT ACTION =============
+    if (action === 'connect') {
+      console.log('=== PROCESSING CONNECT REQUEST ===');
+      
+      // Extract the origin and construct the callback URL
+      const url = new URL(finalRedirectUrl);
+      const callbackUrl = `${url.origin}/oauth/callback`;
+      console.log('Using callback URL:', callbackUrl);
+
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      const state = `${crypto.randomUUID()}|${platform}`;
+      
+      authUrl.searchParams.set('client_id', Deno.env.get('GOOGLE_CLIENT_ID') || '');
+      authUrl.searchParams.set('redirect_uri', callbackUrl);
+      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/userinfo.profile');
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('state', state);
+      
+      console.log('Generated auth URL:', authUrl.toString());
+      
+      const connectResponse = { 
+        auth_url: authUrl.toString(),
+        state: state
+      };
+      
+      console.log('Returning connect response:', connectResponse);
+      return new Response(JSON.stringify(connectResponse), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Use redirect URL from request body or auto-detect as fallback
-    console.log('=== DOMAIN DETECTION ===');
-    const requestedRedirectUrl = requestBody.redirect_url;
-    const fallbackOrigin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/[^/]*$/, '') || 'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev';
-    const redirectUrl = requestedRedirectUrl || `${fallbackOrigin}/creator-dashboard`;
-    
-    console.log('Requested redirect URL:', requestedRedirectUrl);
-    console.log('Fallback origin:', fallbackOrigin);
-    console.log('Final redirect URL:', redirectUrl);
-
-    if (action === 'connect') {
-      console.log('=== PROCESSING CONNECT REQUEST ===');
-      
-      const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-      console.log('Using Google Client ID:', clientId?.substring(0, 20) + '...');
-      
-      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      const state = crypto.randomUUID();
-      authUrl.searchParams.set('client_id', clientId!);
-      // Use the OAuth callback route instead of creator-dashboard directly
-      const callbackUrl = redirectUrl.replace('/creator-dashboard', '/oauth/callback');
-      console.log('Using callback URL:', callbackUrl);
-      
-      authUrl.searchParams.set('redirect_uri', callbackUrl);
-      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/userinfo.profile');
-      authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('state', `${state}|${platform}`);
-
-      const finalAuthUrl = authUrl.toString();
-      console.log('Generated auth URL:', finalAuthUrl);
-      
-      const response = { 
-        auth_url: finalAuthUrl,
-        state: authUrl.searchParams.get('state')
-      };
-      console.log('Returning connect response:', JSON.stringify(response, null, 2));
-      
-      return new Response(JSON.stringify(response), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-
-    } else if (action === 'callback') {
-      console.log('=== PROCESSING CALLBACK REQUEST ===');
-      
-      if (!code) {
-        console.log('ERROR: No authorization code provided');
-        return new Response(JSON.stringify({ 
-          error: 'No authorization code provided' 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
+    // ============= CALLBACK ACTION =============
+    if (action === 'callback') {
+      console.log('=== PROCESSING CALLBACK ===');
       console.log('Step 1: Exchanging code for token...');
       
       // Token exchange - MUST use the same redirect_uri that was sent to Google
       // Extract the origin and construct the callback URL
-      const url = new URL(redirectUrl);
+      const url = new URL(redirect_url);
       const callbackUrl = `${url.origin}/oauth/callback`;
       console.log('Using callback URL for token exchange:', callbackUrl);
       
@@ -165,7 +126,7 @@ serve(async (req) => {
           status: tokenResponse.status,
           statusText: tokenResponse.statusText,
           error: errorText,
-          redirect_uri: `${redirectUrl}?platform=youtube`,
+          redirect_uri: callbackUrl,
           has_client_id: !!Deno.env.get('GOOGLE_CLIENT_ID'),
           has_client_secret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
           code_length: code?.length
@@ -192,13 +153,13 @@ serve(async (req) => {
         return new Response(JSON.stringify({ 
           error: 'Failed to fetch user info' 
         }), {
-          status: 400,
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
       const userInfo = await userResponse.json();
-      console.log('Got user info for:', userInfo.email);
+      console.log('Got user info for:', userInfo.name);
 
       console.log('Step 3: Getting YouTube channel...');
       const channelResponse = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true`, {
@@ -221,7 +182,6 @@ serve(async (req) => {
       console.log('Step 4: Getting authenticated user...');
       const authHeader = req.headers.get('Authorization');
       console.log('Auth header present:', !!authHeader);
-      console.log('All headers:', Object.fromEntries(req.headers.entries()));
       
       if (!authHeader) {
         console.log('ERROR: No authorization header in callback request');
@@ -251,8 +211,8 @@ serve(async (req) => {
           headerLength: authHeader?.length
         });
         return new Response(JSON.stringify({ 
-          error: 'Invalid user token',
-          details: authError?.message || 'User authentication failed'
+          error: 'User authentication failed',
+          details: authError?.message || 'No user found'
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
