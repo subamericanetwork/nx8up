@@ -107,6 +107,35 @@ serve(async (req) => {
         });
       }
 
+      // TEST ENVIRONMENT VARIABLES FIRST
+      console.log(`[${requestId}] Environment variables check:`, {
+        hasGoogleClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+        hasGoogleClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
+        hasYouTubeApiKey: !!Deno.env.get('YOUTUBE_API_KEY'),
+        hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+        hasSupabaseServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      });
+
+      const missingEnvVars = [];
+      if (!Deno.env.get('GOOGLE_CLIENT_ID')) missingEnvVars.push('GOOGLE_CLIENT_ID');
+      if (!Deno.env.get('GOOGLE_CLIENT_SECRET')) missingEnvVars.push('GOOGLE_CLIENT_SECRET'); 
+      if (!Deno.env.get('YOUTUBE_API_KEY')) missingEnvVars.push('YOUTUBE_API_KEY');
+      if (!Deno.env.get('SUPABASE_URL')) missingEnvVars.push('SUPABASE_URL');
+      if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
+
+      if (missingEnvVars.length > 0) {
+        console.error(`[${requestId}] Missing environment variables:`, missingEnvVars);
+        return new Response(JSON.stringify({ 
+          error: 'Missing required environment variables',
+          missing: missingEnvVars,
+          step: 'environment_check',
+          requestId: requestId
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       // Step 1: Exchange code for tokens
       console.log(`[${requestId}] Step 1: Exchanging authorization code for tokens`);
       console.log(`[${requestId}] Environment check:`, {
