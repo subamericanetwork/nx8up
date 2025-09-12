@@ -56,6 +56,14 @@ export default function OAuthCallback() {
         // Get current user session for the authorization header
         const { data: { session } } = await supabase.auth.getSession();
         
+        console.log('Request details:', {
+          action: 'callback',
+          platform,
+          code: code ? `${code.substring(0, 20)}...` : 'MISSING',
+          redirect_url: `${window.location.origin}/oauth/callback`,
+          session_token: session?.access_token ? `${session.access_token.substring(0, 20)}...` : 'MISSING'
+        });
+        
         if (!session) {
           throw new Error('No user session found');
         }
@@ -107,6 +115,11 @@ export default function OAuthCallback() {
         
       } catch (err) {
         console.error('OAuth completion error:', err);
+        console.error('Error details:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        });
         setStatus('error');
         setError(err.message || 'Failed to complete OAuth');
         
