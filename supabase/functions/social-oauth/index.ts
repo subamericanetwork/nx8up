@@ -422,6 +422,13 @@ serve(async (req) => {
       
       try {
         console.log(`[${requestId}] Using secure token update function...`);
+        console.log(`[${requestId}] Function parameters:`, {
+          account_id: account.id,
+          new_access_token: tokens.access_token ? `${tokens.access_token.substring(0, 10)}...` : null,
+          new_refresh_token: tokens.refresh_token ? `${tokens.refresh_token.substring(0, 10)}...` : null,
+          new_expires_at: tokens.expires_in ? 
+            new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+        });
         
         // Use the secure token update function that bypasses RLS properly
         const { data: updateResult, error: updateError } = await supabase
@@ -436,10 +443,13 @@ serve(async (req) => {
         if (updateError) {
           console.log(`[${requestId}] Secure token update failed: ${updateError.message}`);
           console.log(`[${requestId}] Error details:`, JSON.stringify(updateError, null, 2));
+          console.log(`[${requestId}] Error code: ${updateError.code}`);
+          console.log(`[${requestId}] Error hint: ${updateError.hint}`);
           throw new Error(`Failed to store tokens securely: ${updateError.message}`);
         }
         
         console.log(`[${requestId}] Step 5 completed: Tokens stored successfully via secure function`);
+        console.log(`[${requestId}] Update result:`, updateResult);
       } catch (tokenErr) {
         console.error(`[${requestId}] Token storage error:`, tokenErr);
         
