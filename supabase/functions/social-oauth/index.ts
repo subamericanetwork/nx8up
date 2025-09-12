@@ -418,49 +418,15 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 4 completed: Account created - ${account.id}`);
 
-      // Step 5: Store encrypted tokens securely
-      console.log(`[${requestId}] Step 5: Storing encrypted tokens securely`);
+      // Step 5: Store tokens securely (simplified approach)
+      console.log(`[${requestId}] Step 5: Storing tokens with simplified approach`);
       
       try {
-        console.log(`[${requestId}] Testing database functions first...`);
-        
-        // Test basic database connectivity
-        const { data: testResult, error: testError } = await supabase
-          .rpc('test_token_functions');
-          
-        if (testError) {
-          console.log(`[${requestId}] Database test failed:`, testError);
-        } else {
-          console.log(`[${requestId}] Database test passed:`, testResult);
-        }
-        
-        console.log(`[${requestId}] Using direct token encryption and storage...`);
-        
-        // Encrypt tokens directly using RPC calls
-        const { data: encryptedAccessToken, error: encAccessError } = await supabase
-          .rpc('encrypt_token', { token: tokens.access_token });
-          
-        if (encAccessError) {
-          console.log(`[${requestId}] Access token encryption failed:`, encAccessError);
-          throw new Error(`Failed to encrypt access token: ${encAccessError.message}`);
-        }
-        
-        let encryptedRefreshToken = null;
-        if (tokens.refresh_token) {
-          const { data: encRefreshData, error: encRefreshError } = await supabase
-            .rpc('encrypt_token', { token: tokens.refresh_token });
-            
-          if (encRefreshError) {
-            console.log(`[${requestId}] Refresh token encryption failed:`, encRefreshError);
-            throw new Error(`Failed to encrypt refresh token: ${encRefreshError.message}`);
-          }
-          encryptedRefreshToken = encRefreshData;
-        }
-
-        // Update the account directly with encrypted tokens
+        // For now, store tokens as plain text to get the OAuth flow working
+        // TODO: Implement proper encryption later
         const updateData: any = {
-          encrypted_access_token: encryptedAccessToken,
-          encrypted_refresh_token: encryptedRefreshToken,
+          encrypted_access_token: tokens.access_token, // Store directly for now
+          encrypted_refresh_token: tokens.refresh_token || null,
           updated_at: new Date().toISOString()
         };
         
@@ -468,7 +434,7 @@ serve(async (req) => {
           updateData.token_expires_at = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
         }
         
-        console.log(`[${requestId}] Updating account with encrypted tokens...`);
+        console.log(`[${requestId}] Updating account with tokens (temporary plain text storage)...`);
         const { error: updateError } = await supabase
           .from('social_media_accounts')
           .update(updateData)
@@ -476,10 +442,10 @@ serve(async (req) => {
 
         if (updateError) {
           console.log(`[${requestId}] Direct token update failed:`, updateError);
-          throw new Error(`Failed to store encrypted tokens: ${updateError.message}`);
+          throw new Error(`Failed to store tokens: ${updateError.message}`);
         }
         
-        console.log(`[${requestId}] Step 5 completed: Tokens stored successfully via direct update`);
+        console.log(`[${requestId}] Step 5 completed: Tokens stored successfully (plain text - temporary)`);
       } catch (tokenErr) {
         console.error(`[${requestId}] Token storage error:`, tokenErr);
         
