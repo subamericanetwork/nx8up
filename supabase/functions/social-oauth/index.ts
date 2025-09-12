@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🚀 FUNCTION START - Method:', req.method);
+  console.log('🚀 FUNCTION START - Method:', req.method, 'URL:', req.url);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,24 +16,39 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔧 Environment check - SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
+    console.log('🔧 Environment check - SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    console.log('🔧 Environment check - GOOGLE_CLIENT_ID exists:', !!Deno.env.get('GOOGLE_CLIENT_ID'));
+    console.log('🔧 Environment check - GOOGLE_CLIENT_SECRET exists:', !!Deno.env.get('GOOGLE_CLIENT_SECRET'));
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     console.log('✅ Supabase client created');
 
+    console.log('📨 Reading request body...');
     const requestBody = await req.json();
+    console.log('📋 Raw request body:', JSON.stringify(requestBody, null, 2));
+    
     const { action, platform, redirect_url, code } = requestBody;
-    console.log('📋 Request data:', { 
+    console.log('📋 Parsed request data:', { 
       action, 
       platform, 
       has_redirect_url: !!redirect_url, 
-      has_code: !!code 
+      has_code: !!code,
+      code_length: code ? code.length : 0
     });
 
     if (!action || !platform) {
-      console.error('❌ Missing required parameters');
-      throw new Error('Missing action or platform');
+      console.error('❌ Missing required parameters - action:', action, 'platform:', platform);
+      return new Response(JSON.stringify({ 
+        error: 'Missing required parameters',
+        details: { action, platform }
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Auto-detect domain properly
@@ -216,12 +231,15 @@ serve(async (req) => {
     throw new Error('Invalid action');
 
   } catch (error) {
-    console.error('💥 FUNCTION ERROR:', error.message);
-    console.error('📍 Error stack:', error.stack);
+    console.error('💥 FUNCTION ERROR - Type:', typeof error);
+    console.error('💥 FUNCTION ERROR - Message:', error.message);
+    console.error('💥 FUNCTION ERROR - Stack:', error.stack);
+    console.error('💥 FUNCTION ERROR - Full object:', JSON.stringify(error, null, 2));
     
     return new Response(JSON.stringify({ 
-      error: error.message,
-      details: 'Check function logs for more information'
+      error: error.message || 'Unknown error occurred',
+      details: 'Check function logs for more information',
+      timestamp: new Date().toISOString()
     }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
