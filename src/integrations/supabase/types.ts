@@ -608,6 +608,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      validate_rls_security: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          has_anon_block: boolean
+          has_rls: boolean
+          status: string
+          table_name: string
+        }[]
+      }
     }
     Enums: {
       application_status: "pending" | "accepted" | "rejected" | "withdrawn"
