@@ -81,14 +81,15 @@ serve(async (req) => {
       });
     }
 
-    // Auto-detect domain
+    // Use redirect URL from request body or auto-detect as fallback
     console.log('=== DOMAIN DETECTION ===');
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/[^/]*$/, '') || 'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev';
-    const cleanOrigin = origin.replace('https://', '').replace('http://', '');
-    const redirectUrl = `https://${cleanOrigin}/creator-dashboard`;
-    console.log('Detected origin:', origin);
-    console.log('Clean origin:', cleanOrigin);
-    console.log('Redirect URL:', redirectUrl);
+    const requestedRedirectUrl = requestBody.redirect_url;
+    const fallbackOrigin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/[^/]*$/, '') || 'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev';
+    const redirectUrl = requestedRedirectUrl || `${fallbackOrigin}/creator-dashboard`;
+    
+    console.log('Requested redirect URL:', requestedRedirectUrl);
+    console.log('Fallback origin:', fallbackOrigin);
+    console.log('Final redirect URL:', redirectUrl);
 
     if (action === 'connect') {
       console.log('=== PROCESSING CONNECT REQUEST ===');
