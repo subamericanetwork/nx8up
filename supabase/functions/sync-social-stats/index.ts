@@ -170,72 +170,36 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get decrypted tokens using secure function
+    // Get decrypted tokens directly - we're already using service role
     console.log('Getting secure social tokens...');
     
-    // Try the new secure function first
-    let tokenData = null;
-    let tokenError = null;
+    let accessToken = null;
     
+    // Try direct decryption approach since we have service role access
     try {
-      const { data, error } = await supabase
-        .rpc('get_secure_social_tokens', { account_id: account.id });
-      tokenData = data;
-      tokenError = error;
-    } catch (rpcError) {
-      console.log('Secure function failed, trying direct token access:', rpcError);
-      
-      // Fallback: try to get tokens directly from the account record
-      const { data: accountWithTokens, error: accountError } = await supabase
-        .from('social_media_accounts')
-        .select('encrypted_access_token, encrypted_refresh_token')
-        .eq('id', account.id)
-        .single();
-        
-      if (accountError) {
-        throw new Error(`Could not retrieve account tokens: ${accountError.message}`);
-      }
-      
-      if (!accountWithTokens?.encrypted_access_token) {
+      if (!account.encrypted_access_token) {
         throw new Error('No access token found. Please reconnect your YouTube account.');
       }
       
-      // Try to decrypt the token using the decrypt function
-      try {
-        const { data: decryptedToken, error: decryptError } = await supabase
-          .rpc('decrypt_token', { encrypted_token: accountWithTokens.encrypted_access_token });
-          
-        if (decryptError || !decryptedToken) {
-          throw new Error('Could not decrypt access token. Please reconnect your account.');
-        }
+      // Use the decrypt_token function directly with service role privileges
+      const { data: decryptedToken, error: decryptError } = await supabase
+        .rpc('decrypt_token', { encrypted_token: account.encrypted_access_token });
         
-        tokenData = [{ access_token: decryptedToken }];
-      } catch (decryptErr) {
-        console.error('Token decryption failed:', decryptErr);
-        throw new Error('Token decryption failed. Please reconnect your YouTube account.');
+      if (decryptError) {
+        console.error('Token decryption error:', decryptError);
+        throw new Error(`Could not decrypt access token: ${decryptError.message}`);
       }
-    }
-    
-    console.log('Token retrieval result:', { 
-      success: !!tokenData, 
-      error: tokenError?.message,
-      hasTokenData: !!tokenData && tokenData.length > 0
-    });
-    
-    if (tokenError) {
-      console.error('Token retrieval error:', tokenError);
-      throw new Error(`Could not retrieve access token: ${tokenError.message}`);
-    }
-    
-    if (!tokenData || tokenData.length === 0) {
-      console.error('No token data returned from secure function');
-      throw new Error('No access token found for this account. Please reconnect your YouTube account.');
-    }
-    
-    const accessToken = tokenData[0]?.access_token;
-    if (!accessToken || accessToken.trim() === '') {
-      console.error('Access token is empty after decryption');
-      throw new Error('Access token is empty. Please reconnect your YouTube account.');
+      
+      if (!decryptedToken || decryptedToken.trim() === '') {
+        throw new Error('Decrypted token is empty. Please reconnect your YouTube account.');
+      }
+      
+      accessToken = decryptedToken;
+      console.log('Successfully decrypted access token');
+      
+    } catch (decryptError) {
+      console.error('Direct token decryption failed:', decryptError);
+      throw new Error('Could not access tokens. Please reconnect your YouTube account.');
     }
     
     console.log('Successfully retrieved decrypted access token for YouTube API');
