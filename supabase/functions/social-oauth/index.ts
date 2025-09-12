@@ -100,7 +100,11 @@ serve(async (req) => {
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       const state = crypto.randomUUID();
       authUrl.searchParams.set('client_id', clientId!);
-      authUrl.searchParams.set('redirect_uri', redirectUrl);
+      // Use the OAuth callback route instead of creator-dashboard directly
+      const callbackUrl = redirectUrl.replace('/creator-dashboard', '/oauth/callback');
+      console.log('Using callback URL:', callbackUrl);
+      
+      authUrl.searchParams.set('redirect_uri', callbackUrl);
       authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/userinfo.profile');
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('state', `${state}|${platform}`);

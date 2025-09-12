@@ -150,29 +150,72 @@ export default function SocialMediaConnections() {
           throw new Error('Popup blocked. Please allow popups for this site and try again.');
         }
         
+        // Set up message listener for OAuth callback
+        const messageListener = (event: MessageEvent) => {
+          // Verify origin for security
+          if (!event.origin.includes('nx8up.loveable.app') && 
+              !event.origin.includes('lovable.app') && 
+              !event.origin.includes('lovable.dev') &&
+              !event.origin.includes('sandbox.lovable.dev') &&
+              !event.origin.includes(window.location.origin)) {
+            return;
+          }
+          
+          console.log('Received message from popup:', event.data);
+          
+          if (event.data?.type === 'OAUTH_CALLBACK') {
+            const { code, error, platform: callbackPlatform } = event.data;
+            
+            // Clean up
+            window.removeEventListener('message', messageListener);
+            if (checkClosed) clearInterval(checkClosed);
+            popup.close();
+            
+            if (error) {
+              console.error('OAuth error from popup:', error);
+              toast({
+                title: 'Connection Failed',
+                description: 'OAuth authorization was denied or failed',
+                variant: 'destructive'
+              });
+              setConnecting(null);
+              return;
+            }
+
+            if (code) {
+              console.log('OAuth code received via message, processing callback...');
+              handleOAuthCallback(callbackPlatform || platform, code);
+            }
+          }
+        };
+        
+        window.addEventListener('message', messageListener);
+        
         // Monitor popup for completion and OAuth callback
         const checkClosed = setInterval(() => {
           try {
             // Check if popup is closed
             if (popup.closed) {
               clearInterval(checkClosed);
+              window.removeEventListener('message', messageListener);
               setConnecting(null);
               // Refresh accounts to see if connection was successful
               setTimeout(() => loadConnectedAccounts(), 1000);
               return;
             }
 
-            // Try to access popup URL to detect callback
+            // Try to detect if we're back on our domain
             try {
               const popupUrl = popup.location.href;
-              console.log('Popup URL:', popupUrl);
+              console.log('Popup URL detected:', popupUrl);
               
-              // Check if we're back on our domain (handle all Lovable domains)
-              if (popupUrl.includes(window.location.origin) || 
+              // Check if we're back on our domain (handle all domains)
+              if (popupUrl.includes('nx8up.loveable.app') || 
                   popupUrl.includes('lovable.app') || 
                   popupUrl.includes('lovable.dev') ||
                   popupUrl.includes('sandbox.lovable.dev') ||
-                  popupUrl.includes('nx8up.loveable.app')) {
+                  popupUrl.includes(window.location.origin)) {
+                
                 const urlParams = new URLSearchParams(new URL(popupUrl).search);
                 const code = urlParams.get('code');
                 const error = urlParams.get('error');
@@ -184,11 +227,12 @@ export default function SocialMediaConnections() {
                   callbackPlatform = state.split('|')[1];
                 }
                 
-                console.log('Callback detected:', { code: !!code, error, platform: callbackPlatform });
+                console.log('Direct callback detected:', { code: !!code, error, platform: callbackPlatform });
                 
                 if (code || error) {
                   // OAuth callback detected - process it
                   clearInterval(checkClosed);
+                  window.removeEventListener('message', messageListener);
                   popup.close();
                   
                   if (error) {
@@ -203,7 +247,7 @@ export default function SocialMediaConnections() {
                   }
 
                   if (code) {
-                    console.log('OAuth code received, processing callback...');
+                    console.log('OAuth code received directly, processing callback...');
                     // Process the OAuth callback
                     handleOAuthCallback(callbackPlatform, code);
                   }
@@ -212,17 +256,18 @@ export default function SocialMediaConnections() {
             } catch (e) {
               // Cross-origin error - popup is still on OAuth provider's domain
               // This is expected, continue monitoring
-              console.log('Cross-origin access blocked (expected while on OAuth provider)');
+              // console.log('Cross-origin access blocked (expected while on OAuth provider)');
             }
           } catch (error) {
             // If we can't access the popup, it might be closed
             console.error('Error monitoring popup:', error);
             if (popup.closed) {
               clearInterval(checkClosed);
+              window.removeEventListener('message', messageListener);
               setConnecting(null);
             }
           }
-        }, 500); // Check more frequently
+        }, 500);
 
         // Also add a timeout to prevent infinite waiting
         setTimeout(() => {
