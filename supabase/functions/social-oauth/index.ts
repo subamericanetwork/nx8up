@@ -69,16 +69,15 @@ serve(async (req) => {
     if (action === 'connect') {
       console.log('=== PROCESSING CONNECT REQUEST ===');
       
-      // Extract the origin and construct the callback URL
-      const url = new URL(finalRedirectUrl);
-      const callbackUrl = `${url.origin}/oauth/callback`;
-      console.log('Using callback URL:', callbackUrl);
+      // Use consistent redirect URI - must match Google Console configuration exactly
+      const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
+      console.log('Using standardized callback URL:', authRedirectUri);
 
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       const state = `${crypto.randomUUID()}|${platform}`;
       
       authUrl.searchParams.set('client_id', Deno.env.get('GOOGLE_CLIENT_ID') || '');
-      authUrl.searchParams.set('redirect_uri', callbackUrl);
+      authUrl.searchParams.set('redirect_uri', authRedirectUri);
       authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/userinfo.profile');
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('state', state);
@@ -101,11 +100,9 @@ serve(async (req) => {
       console.log('=== PROCESSING CALLBACK ===');
       console.log('Step 1: Exchanging code for token...');
       
-      // Token exchange - MUST use the same redirect_uri that was sent to Google
-      // Extract the origin and construct the callback URL
-      const url = new URL(redirect_url);
-      const callbackUrl = `${url.origin}/oauth/callback`;
-      console.log('Using callback URL for token exchange:', callbackUrl);
+      // Use the SAME redirect URI as connect - must match Google Console configuration
+      const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
+      console.log('Using standardized callback URL for token exchange:', authRedirectUri);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -114,7 +111,7 @@ serve(async (req) => {
           grant_type: 'authorization_code',
           client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-          redirect_uri: callbackUrl,  // MUST match what was sent to Google
+          redirect_uri: authRedirectUri,  // MUST match what was sent to Google
           code: code
         })
       });
@@ -128,14 +125,14 @@ serve(async (req) => {
           status: tokenResponse.status,
           statusText: tokenResponse.statusText,
           error: errorText,
-          redirect_uri: callbackUrl,
+          redirect_uri: authRedirectUri,
           has_client_id: !!Deno.env.get('GOOGLE_CLIENT_ID'),
           has_client_secret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
           code_length: code?.length
         });
         return new Response(JSON.stringify({ 
-          error: `Token exchange failed: ${tokenResponse.status} - ${errorText}`,
-          details: 'OAuth callback error - check Google Cloud Console configuration'
+          error: `Token exchange failed: ${tokenResponse.status} - ${errorText}. Make sure your Google OAuth app is configured with redirect URI: https://nx8up.lovable.app/oauth/callback`,
+          details: 'Check Google Cloud Console OAuth configuration'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
