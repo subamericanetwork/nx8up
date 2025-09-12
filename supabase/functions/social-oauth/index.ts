@@ -163,18 +163,78 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 3 completed: User validated - ${user.id}`);
 
-      // Step 4: Create account (simplified for now - just return success)
-      console.log(`[${requestId}] Step 4: Account creation (simplified)`);
+      // Step 4: Create account
+      console.log(`[${requestId}] Step 4: Creating social media account`);
       
-      // For now, just return success with the data we collected
+      const username = channel.snippet.customUrl || channel.snippet.title || `channel-${channel.id}`;
+      const displayName = channel.snippet.title || 'YouTube Channel';
+
+      const { data: account, error: accountError } = await supabase
+        .from('social_media_accounts')
+        .upsert({
+          creator_id: user.id,
+          platform: 'youtube',
+          platform_user_id: channel.id,
+          username: username,
+          display_name: displayName,
+          profile_image_url: channel.snippet.thumbnails?.default?.url,
+          is_active: true,
+          connected_at: new Date().toISOString(),
+          token_expires_at: tokens.expires_in ? 
+            new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+        }, {
+          onConflict: 'creator_id,platform',
+          ignoreDuplicates: false
+        })
+        .select()
+        .single();
+
+      if (accountError) {
+        console.log(`[${requestId}] Account creation failed: ${accountError.message}`);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to create social media account',
+          details: accountError.message,
+          step: 'account_creation'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      console.log(`[${requestId}] Step 4 completed: Account created - ${account.id}`);
+
+      // Step 5: Store encrypted tokens
+      console.log(`[${requestId}] Step 5: Storing encrypted tokens`);
+      
+      const { error: tokenError } = await supabase.rpc('update_encrypted_tokens', {
+        account_id: account.id,
+        new_access_token: tokens.access_token,
+        new_refresh_token: tokens.refresh_token || null
+      });
+
+      if (tokenError) {
+        console.log(`[${requestId}] Token storage failed: ${tokenError.message}`);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to store tokens',
+          details: tokenError.message,
+          step: 'token_storage'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      console.log(`[${requestId}] Step 5 completed: Tokens stored successfully`);
+      
+      // Return success with account information
       return new Response(JSON.stringify({ 
         success: true,
-        message: 'OAuth flow completed successfully',
-        debug: {
-          channel_id: channel.id,
-          channel_title: channel.snippet.title,
-          user_id: user.id,
-          request_id: requestId
+        message: 'YouTube account connected successfully',
+        account: {
+          id: account.id,
+          platform: account.platform,
+          username: account.username,
+          display_name: account.display_name
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
