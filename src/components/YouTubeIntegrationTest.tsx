@@ -126,7 +126,40 @@ export default function YouTubeIntegrationTest() {
         addResult('Stats Sync', 'warning', 'No YouTube accounts to test sync', null);
       }
 
-      // Test 6: Check environment variables (indirectly)
+      // Test 6: Check environment variables
+      addResult('Environment Variables', 'pending', 'Checking environment variables...', null);
+      
+      try {
+        const { data: envData, error: envError } = await supabase.functions.invoke('test-env');
+        
+        if (envError) {
+          addResult('Environment Variables', 'error', `Env Check Error: ${envError.message}`, envError);
+        } else if (envData?.error) {
+          addResult('Environment Variables', 'error', `Env Function Error: ${envData.error}`, envData);
+        } else {
+          // Check if all required variables exist
+          const env = envData.environment;
+          const missing = [];
+          
+          if (!env.GOOGLE_CLIENT_ID?.exists) missing.push('GOOGLE_CLIENT_ID');
+          if (!env.GOOGLE_CLIENT_SECRET?.exists) missing.push('GOOGLE_CLIENT_SECRET');
+          if (!env.YOUTUBE_API_KEY?.exists) missing.push('YOUTUBE_API_KEY');
+          if (!env.SUPABASE_URL?.exists) missing.push('SUPABASE_URL');
+          if (!env.SUPABASE_SERVICE_ROLE_KEY?.exists) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+          
+          if (missing.length > 0) {
+            addResult('Environment Variables', 'error', 
+              `Missing variables: ${missing.join(', ')}`, envData.environment);
+          } else {
+            addResult('Environment Variables', 'success', 
+              'All required environment variables present', envData.environment);
+          }
+        }
+      } catch (envErr: any) {
+        addResult('Environment Variables', 'error', `Network Error: ${envErr.message}`, envErr);
+      }
+
+      // Test 7: Check configuration
       addResult('Configuration', 'pending', 'Checking configuration...', null);
       
       try {
