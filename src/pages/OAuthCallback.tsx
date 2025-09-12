@@ -112,7 +112,7 @@ export default function OAuthCallback() {
               success: true,
               account: data.account,
               platform
-            }, window.location.origin); // Use specific origin instead of '*'
+            }, '*'); // Use '*' for cross-origin messaging
             
             // Close the popup after a brief delay
             setTimeout(() => {
@@ -152,7 +152,7 @@ export default function OAuthCallback() {
               type: 'OAUTH_CALLBACK',
               error: err.message || 'Failed to complete OAuth',
               platform
-            }, window.location.origin); // Use specific origin instead of '*'
+            }, '*'); // Use '*' for cross-origin messaging
             
             setTimeout(() => {
               try {

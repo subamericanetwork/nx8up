@@ -109,10 +109,8 @@ export default function SocialMediaConnections() {
       console.log('Current window.location.href:', window.location.href);
       console.log('Current window.location.origin:', window.location.origin);
       
-      // Use the production domain for OAuth redirect
-      const redirectUrl = window.location.hostname.includes('sandbox.lovable.dev') 
-        ? 'https://nx8up.loveable.app/creator-dashboard'
-        : `${window.location.origin}/creator-dashboard`;
+      // Use the correct OAuth callback URL (not dashboard)
+      const redirectUrl = 'https://nx8up.lovable.app/oauth/callback';
         
       console.log('Redirect URL will be:', redirectUrl);
         
@@ -308,10 +306,8 @@ export default function SocialMediaConnections() {
     try {
       console.log('Processing OAuth callback for platform:', platform);
       
-      // Use the same redirect URL logic as the connect flow
-      const redirectUrl = window.location.hostname.includes('sandbox.lovable.dev') 
-        ? 'https://nx8up.loveable.app/creator-dashboard'
-        : `${window.location.origin}/creator-dashboard`;
+      // Use the same redirect URL as used in connect flow
+      const redirectUrl = 'https://nx8up.lovable.app/oauth/callback';
       
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
