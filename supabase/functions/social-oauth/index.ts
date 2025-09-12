@@ -6,464 +6,222 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface OAuthConfig {
-  client_id: string;
-  redirect_uri: string;
-  scope: string;
-  auth_url: string;
-  token_url: string;
-}
-
-const getOAuthConfig = (platform: string, redirectUrl: string): OAuthConfig | null => {
-  const baseRedirectUri = `${redirectUrl}?platform=${platform}`;
-  
-  switch (platform) {
-    case 'youtube':
-      return {
-        client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
-        redirect_uri: baseRedirectUri,
-        scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/youtube.channel-memberships.creator',
-        auth_url: 'https://accounts.google.com/o/oauth2/v2/auth',
-        token_url: 'https://oauth2.googleapis.com/token'
-      };
-    
-    case 'instagram':
-      return {
-        client_id: Deno.env.get('INSTAGRAM_CLIENT_ID') || '',
-        redirect_uri: baseRedirectUri,
-        scope: 'user_profile,user_media',
-        auth_url: 'https://api.instagram.com/oauth/authorize',
-        token_url: 'https://api.instagram.com/oauth/access_token'
-      };
-    
-    case 'tiktok':
-      return {
-        client_id: Deno.env.get('TIKTOK_CLIENT_ID') || '',
-        redirect_uri: baseRedirectUri,
-        scope: 'user.info.basic,video.list',
-        auth_url: 'https://www.tiktok.com/auth/authorize/',
-        token_url: 'https://open-api.tiktok.com/oauth/access_token/'
-      };
-    
-    case 'twitter':
-      return {
-        client_id: Deno.env.get('TWITTER_CLIENT_ID') || '',
-        redirect_uri: baseRedirectUri,
-        scope: 'tweet.read users.read follows.read',
-        auth_url: 'https://twitter.com/i/oauth2/authorize',
-        token_url: 'https://api.twitter.com/2/oauth2/token'
-      };
-    
-    default:
-      return null;
-  }
-};
-
-const exchangeCodeForToken = async (platform: string, code: string, config: OAuthConfig): Promise<any> => {
-  const tokenData = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: config.client_id,
-    client_secret: Deno.env.get(`${platform.toUpperCase()}_CLIENT_SECRET`) || '',
-    redirect_uri: config.redirect_uri,
-    code: code
-  });
-
-  const response = await fetch(config.token_url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json'
-    },
-    body: tokenData
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Token exchange failed:', response.status, errorText);
-    throw new Error(`Token exchange failed: ${response.statusText}`);
-  }
-
-  return await response.json();
-};
-
-const getUserInfo = async (platform: string, accessToken: string): Promise<any> => {
-  let userInfoUrl = '';
-  let headers: Record<string, string> = {
-    'Authorization': `Bearer ${accessToken}`
-  };
-
-  switch (platform) {
-    case 'youtube':
-      // First get user info, then get channel info
-      console.log('=== YOUTUBE API CALLS ===');
-      userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
-      console.log('Fetching user info from:', userInfoUrl);
-      
-      const userInfoResponse = await fetch(userInfoUrl, { headers });
-      console.log('User info response status:', userInfoResponse.status);
-      
-      if (!userInfoResponse.ok) {
-        const errorText = await userInfoResponse.text();
-        console.error('User info fetch failed:', userInfoResponse.status, errorText);
-        throw new Error(`Failed to fetch user info: ${userInfoResponse.statusText}`);
-      }
-      
-      const userInfo = await userInfoResponse.json();
-      console.log('User info response:', JSON.stringify(userInfo, null, 2));
-      
-      // Now get YouTube channel info
-      const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&access_token=${accessToken}`;
-      console.log('Fetching channel info from:', channelUrl);
-      
-      const channelResponse = await fetch(channelUrl);
-      console.log('Channel response status:', channelResponse.status);
-      
-      if (channelResponse.ok) {
-        const channelData = await channelResponse.json();
-        console.log('Channel data response:', JSON.stringify(channelData, null, 2));
-        
-        if (channelData.items && channelData.items.length > 0) {
-          const channel = channelData.items[0];
-          console.log('Using channel data for account info');
-          // Combine user info with channel info
-          return {
-            ...userInfo,
-            id: channel.id,
-            username: channel.snippet.customUrl || channel.snippet.title,
-            display_name: channel.snippet.title,
-            profile_image_url: channel.snippet.thumbnails?.default?.url || userInfo.picture,
-            subscriber_count: channel.statistics?.subscriberCount || 0,
-            video_count: channel.statistics?.videoCount || 0
-          };
-        } else {
-          console.log('No channel items found in response');
-        }
-      } else {
-        const errorText = await channelResponse.text();
-        console.error('Channel fetch failed:', channelResponse.status, errorText);
-      }
-      
-      // Fallback to user info if channel fetch fails
-      console.log('Using fallback user info for account');
-      return {
-        ...userInfo,
-        id: userInfo.id, // Explicitly preserve the ID
-        username: userInfo.name || userInfo.email?.split('@')[0] || 'user',
-        display_name: userInfo.name || 'User'
-      };
-      
-    case 'instagram':
-      userInfoUrl = `https://graph.instagram.com/me?fields=id,username,account_type,media_count&access_token=${accessToken}`;
-      headers = {}; // Instagram uses access_token in URL
-      break;
-    case 'tiktok':
-      userInfoUrl = 'https://open-api.tiktok.com/oauth/userinfo/';
-      break;
-    case 'twitter':
-      userInfoUrl = 'https://api.twitter.com/2/users/me';
-      break;
-  }
-
-  // For non-YouTube platforms, use the original logic
-  if (platform !== 'youtube') {
-    const response = await fetch(userInfoUrl, { headers });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user info: ${response.statusText}`);
-    }
-
-    return await response.json();
-  }
-};
-
 serve(async (req) => {
-  console.log('=== SOCIAL OAUTH FUNCTION CALLED ===');
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
+  console.log('🚀 FUNCTION START - Method:', req.method);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request');
+    console.log('✅ CORS preflight handled');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Headers:', req.headers);
-    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-    console.log('Supabase client created successfully');
+    console.log('✅ Supabase client created');
 
     const requestBody = await req.json();
-    const { action, platform, redirect_url, code, state } = requestBody;
+    const { action, platform, redirect_url, code } = requestBody;
+    console.log('📋 Request data:', { 
+      action, 
+      platform, 
+      has_redirect_url: !!redirect_url, 
+      has_code: !!code 
+    });
 
-    console.log('OAuth request:', { action, platform, redirect_url, code: !!code, state });
-
-    // Validate required parameters
     if (!action || !platform) {
-      console.error('Missing required parameters:', { action, platform });
-      throw new Error('Missing required parameters: action and platform');
+      console.error('❌ Missing required parameters');
+      throw new Error('Missing action or platform');
     }
 
-    // Auto-detect the correct domain from the request headers
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '');
-    const actualRedirectUrl = redirect_url || `${origin}/creator-dashboard`;
-    
-    console.log('Domain detection:', {
-      origin,
-      referer: req.headers.get('referer'),
-      provided_redirect_url: redirect_url,
-      actual_redirect_url: actualRedirectUrl
-    });
-
-    // Check if required environment variables exist
-    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-    
-    console.log('Environment check:', {
-      hasGoogleClientId: !!googleClientId,
-      hasGoogleClientSecret: !!googleClientSecret,
-      googleClientIdLength: googleClientId?.length || 0
-    });
+    // Auto-detect domain
+    const origin = req.headers.get('origin') || 'https://nx8up.lovable.app';
+    const actualRedirectUrl = `${origin}/creator-dashboard`;
+    console.log('🌐 Using redirect URL:', actualRedirectUrl);
 
     if (action === 'connect') {
-      // Step 1: Generate OAuth URL
-      const config = getOAuthConfig(platform, actualRedirectUrl);
+      console.log('🔗 Processing CONNECT request');
       
-      if (!config || !config.client_id) {
-        console.error(`OAuth not configured for ${platform}`, { config });
-        throw new Error(`OAuth not configured for ${platform}. Missing client ID.`);
+      const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+      if (!clientId) {
+        console.error('❌ No Google Client ID found');
+        throw new Error('Google Client ID not configured');
       }
-
-      console.log('Using redirect URL:', config.redirect_uri);
-
-      // Generate state parameter for CSRF protection
-      const stateParam = crypto.randomUUID();
       
-      const authUrl = new URL(config.auth_url);
-      authUrl.searchParams.set('client_id', config.client_id);
-      authUrl.searchParams.set('redirect_uri', config.redirect_uri);
-      authUrl.searchParams.set('scope', config.scope);
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', clientId);
+      authUrl.searchParams.set('redirect_uri', `${actualRedirectUrl}?platform=youtube`);
+      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile');
       authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('state', stateParam);
+      authUrl.searchParams.set('state', crypto.randomUUID());
 
-      console.log('Generated auth URL:', authUrl.toString());
-
-      return new Response(
-        JSON.stringify({ 
-          auth_url: authUrl.toString(),
-          state: stateParam 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      console.log('✅ Generated auth URL successfully');
+      return new Response(JSON.stringify({ 
+        auth_url: authUrl.toString(),
+        state: authUrl.searchParams.get('state')
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
 
     } else if (action === 'callback') {
-      console.log('=== OAUTH CALLBACK PROCESSING ===');
-      console.log('Platform:', platform, 'Code provided:', !!code);
+      console.log('🔄 Processing CALLBACK request');
       
-      // Step 2: Handle OAuth callback
       if (!code) {
-        console.error('No authorization code provided in callback');
-        throw new Error('Authorization code not provided');
+        console.error('❌ No authorization code provided');
+        throw new Error('No authorization code provided');
       }
 
-      const config = getOAuthConfig(platform, actualRedirectUrl);
-      if (!config) {
-        console.error(`OAuth not configured for platform: ${platform}`);
-        throw new Error(`OAuth not configured for ${platform}`);
-      }
+      console.log('1️⃣ Exchanging code for token...');
       
-      console.log('OAuth config retrieved for platform:', platform);
+      // Step 1: Exchange code for token
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+          redirect_uri: `${actualRedirectUrl}?platform=youtube`,
+          code: code
+        })
+      });
 
-      // Exchange code for access token
-      console.log('Exchanging authorization code for access token...');
-      const tokenResponse = await exchangeCodeForToken(platform, code, config);
-      console.log('Token exchange successful for platform:', platform, 'Has access token:', !!tokenResponse.access_token);
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error('❌ Token exchange failed:', tokenResponse.status, errorText);
+        throw new Error(`Token exchange failed: ${errorText}`);
+      }
 
-      // Get user information
-      console.log('Fetching user information from platform API...');
-      const userInfo = await getUserInfo(platform, tokenResponse.access_token);
-      console.log('Raw user info from API:', JSON.stringify(userInfo, null, 2));
-      console.log('User info retrieved for platform:', platform, 'User ID available:', !!(userInfo?.id));
+      const tokenData = await tokenResponse.json();
+      console.log('✅ Token exchange successful');
 
-      // Get the current user from the auth header
-      console.log('Validating user authentication...');
+      console.log('2️⃣ Getting user info...');
+      
+      // Step 2: Get user info
+      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+
+      if (!userResponse.ok) {
+        console.error('❌ User info fetch failed:', userResponse.status);
+        throw new Error('Failed to fetch user info');
+      }
+
+      const userInfo = await userResponse.json();
+      console.log('✅ Got user info:', { id: userInfo.id, email: userInfo.email });
+
+      console.log('3️⃣ Getting YouTube channel...');
+      
+      // Step 3: Get YouTube channel
+      const channelResponse = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true`, {
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+
+      let channelData = null;
+      if (channelResponse.ok) {
+        const channelResult = await channelResponse.json();
+        if (channelResult.items && channelResult.items.length > 0) {
+          channelData = channelResult.items[0];
+          console.log('✅ Got YouTube channel:', channelData.snippet.title);
+        } else {
+          console.log('⚠️ No YouTube channel found');
+        }
+      } else {
+        console.log('⚠️ YouTube API call failed:', channelResponse.status);
+      }
+
+      console.log('4️⃣ Getting authenticated user...');
+      
+      // Step 4: Get authenticated user
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
-        console.error('No Authorization header provided in callback');
-        throw new Error('No authorization header provided');
+        console.error('❌ No auth header');
+        throw new Error('No authorization header');
       }
 
-      console.log('Auth header present, extracting user...');
       const { data: { user }, error: authError } = await supabase.auth.getUser(
         authHeader.replace('Bearer ', '')
       );
 
       if (authError || !user) {
-        console.error('User authentication failed:', authError);
+        console.error('❌ Auth failed:', authError);
         throw new Error('Invalid user token');
       }
-      
-      console.log('User authenticated successfully:', user.id);
 
-      // Store the connection in our database - first without tokens
-      console.log('Preparing social account data for database...');
-      
-      let platformUserId, username, displayName, profileImageUrl;
-      
-      console.log('Processing user info for platform:', platform);
-      console.log('Available userInfo fields:', Object.keys(userInfo || {}));
-      
-      if (platform === 'youtube') {
-        // For YouTube, we get combined user info with channel data
-        platformUserId = userInfo?.id;
-        username = userInfo?.username || userInfo?.display_name || userInfo?.name || userInfo?.email?.split('@')[0] || 'Unknown';
-        displayName = userInfo?.display_name || userInfo?.name || 'YouTube Channel';  
-        profileImageUrl = userInfo?.profile_image_url || userInfo?.picture;
-        
-        console.log('YouTube user extraction:', {
-          platformUserId,
-          username,
-          displayName,
-          profileImageUrl: !!profileImageUrl
-        });
-      } else {
-        // For other platforms
-        platformUserId = userInfo.id || userInfo.data?.user?.id;
-        username = userInfo.login || userInfo.username || userInfo.data?.user?.username;
-        displayName = userInfo.name || userInfo.display_name || userInfo.data?.user?.display_name;
-        profileImageUrl = userInfo.picture || userInfo.profile_image_url || userInfo.avatar_url;
-      }
+      console.log('✅ Authenticated user:', user.id);
 
-      // Validate required fields before proceeding
-      if (!platformUserId) {
-        console.error('Missing platform user ID from API response:', {
-          platform,
-          userInfo_keys: Object.keys(userInfo || {}),
-          userInfo: JSON.stringify(userInfo || {}).substring(0, 500)
-        });
-        throw new Error('Unable to extract user ID from platform API response');
-      }
-
-      if (!username) {
-        console.warn('Missing username, using fallback');
-        username = `${platform}_user_${platformUserId.substring(0, 8)}`;
-      }
-
-      const socialAccountData = {
+      console.log('5️⃣ Saving to database...');
+      
+      // Step 5: Save to database
+      const accountData = {
         creator_id: user.id,
-        platform: platform,
-        platform_user_id: platformUserId,
-        username: username,
-        display_name: displayName,
-        profile_image_url: profileImageUrl,
-        token_expires_at: tokenResponse.expires_in ? 
-          new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString() : null,
+        platform: 'youtube',
+        platform_user_id: channelData?.id || userInfo.id,
+        username: channelData?.snippet?.title || userInfo.name || 'User',
+        display_name: channelData?.snippet?.title || userInfo.name || 'User',
+        profile_image_url: channelData?.snippet?.thumbnails?.default?.url || userInfo.picture,
         is_active: true,
         connected_at: new Date().toISOString()
       };
 
-      console.log('Social account data validation:', {
-        creator_id: socialAccountData.creator_id,
-        platform: socialAccountData.platform,
-        platform_user_id: platformUserId,
-        username: username,
-        display_name: displayName,
-        has_required_fields: !!(platformUserId && username),
-        userInfo_keys: Object.keys(userInfo || {}),
-        userInfo_sample: JSON.stringify(userInfo || {}).substring(0, 200)
-      });
-
-      console.log('Storing social account in database...');
-      const { data: accountData, error: accountError } = await supabase
+      const { data: savedAccount, error: dbError } = await supabase
         .from('social_media_accounts')
-        .upsert(socialAccountData, {
-          onConflict: 'creator_id,platform,platform_user_id'
+        .upsert(accountData, {
+          onConflict: 'creator_id,platform'
         })
         .select()
         .single();
 
-      console.log('Database upsert result:', { 
-        success: !!accountData, 
-        error: accountError,
-        accountId: accountData?.id 
+      if (dbError) {
+        console.error('❌ Database error:', dbError);
+        throw new Error(`Database error: ${dbError.message}`);
+      }
+
+      console.log('✅ Account saved:', savedAccount.id);
+
+      // Step 6: Save tokens securely
+      const { error: tokenError } = await supabase.rpc('update_encrypted_tokens', {
+        account_id: savedAccount.id,
+        new_access_token: tokenData.access_token,
+        new_refresh_token: tokenData.refresh_token
       });
 
-      if (accountError) {
-        console.error('Database error creating social account:', accountError);
-        throw new Error(`Failed to store account connection: ${accountError.message}`);
+      if (tokenError) {
+        console.log('⚠️ Token save failed (account still created):', tokenError);
+      } else {
+        console.log('✅ Tokens saved securely');
       }
+
+      console.log('🎉 SUCCESS - Account connected!');
       
-      console.log('Social account stored successfully:', accountData.id);
-
-      // Now securely update the encrypted tokens using the secure function
-      const { error: tokenUpdateError } = await supabase
-        .rpc('update_encrypted_tokens', {
-          account_id: accountData.id,
-          new_access_token: tokenResponse.access_token,
-          new_refresh_token: tokenResponse.refresh_token
-        });
-
-      if (tokenUpdateError) {
-        console.error('Error updating encrypted tokens:', tokenUpdateError);
-        throw new Error('Failed to store tokens securely');
-      }
-
-      console.log('Account stored successfully:', accountData.id);
-
-      // Automatically sync stats for the newly connected account
-      try {
-        console.log('Attempting to sync stats for newly connected account...');
-        const { data: syncResult, error: syncError } = await supabase.functions.invoke('sync-social-stats', {
-          body: { accountId: accountData.id }
-        });
-        
-        if (syncError) {
-          console.error('Failed to sync stats after connection:', syncError);
-        } else {
-          console.log('Successfully synced stats after connection:', syncResult);
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: 'YouTube account connected successfully!',
+        account: {
+          id: savedAccount.id,
+          platform: savedAccount.platform,
+          username: savedAccount.username,
+          display_name: savedAccount.display_name
         }
-      } catch (syncError) {
-        console.error('Error calling sync-social-stats:', syncError);
-        // Don't fail the connection if stats sync fails
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          account: {
-            id: accountData.id,
-            platform: accountData.platform,
-            username: accountData.username,
-            display_name: accountData.display_name,
-            profile_image_url: accountData.profile_image_url,
-            connected_at: accountData.connected_at
-          },
-          message: `${platform} account connected successfully!`
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    throw new Error('Invalid action specified');
+    throw new Error('Invalid action');
 
   } catch (error) {
-    console.error('OAuth error:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: 'Check the function logs for more information'
-      }),
-      { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    console.error('💥 FUNCTION ERROR:', error.message);
+    console.error('📍 Error stack:', error.stack);
+    
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: 'Check function logs for more information'
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });
