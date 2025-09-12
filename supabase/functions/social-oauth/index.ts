@@ -138,7 +138,9 @@ serve(async (req) => {
       console.log('Step 1: Exchanging code for token...');
       
       // Token exchange - MUST use the same redirect_uri that was sent to Google
-      const callbackUrl = redirectUrl.replace('/creator-dashboard', '/oauth/callback');
+      // Extract the origin and construct the callback URL
+      const url = new URL(redirectUrl);
+      const callbackUrl = `${url.origin}/oauth/callback`;
       console.log('Using callback URL for token exchange:', callbackUrl);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
