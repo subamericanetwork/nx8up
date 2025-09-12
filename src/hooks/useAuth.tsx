@@ -99,7 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: error.name,
           stack: error.stack
         });
-        throw error;
+        
+        // If session is already missing, treat as successful sign out
+        if (error.name === 'AuthSessionMissingError' || error.message?.includes('Auth session missing')) {
+          console.log('Session already missing - treating as successful sign out');
+        } else {
+          throw error;
+        }
       }
       console.log('Sign out successful - clearing local state');
       
