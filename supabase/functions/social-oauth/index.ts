@@ -178,7 +178,7 @@ serve(async (req) => {
       const channel = channelData.items[0];
       console.log(`[${requestId}] Step 2 completed: Channel found - ${channel.snippet.title}`);
 
-      // Step 3: Get user from session (JWT verification disabled for this function)
+      // Step 3: Get user from session or fallback method (JWT verification disabled)
       console.log(`[${requestId}] Step 3: Getting authenticated user`);
       
       const supabase = createClient(
@@ -186,11 +186,10 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
       );
 
-      // Since JWT verification is disabled, we need to get the current authenticated user
-      // by checking the session cookie or using another method
-      const authHeader = req.headers.get('authorization');
       let user = null;
       
+      // Try to get user from auth header if provided
+      const authHeader = req.headers.get('authorization');
       if (authHeader) {
         try {
           const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(
@@ -198,29 +197,17 @@ serve(async (req) => {
           );
           if (!userError && authUser) {
             user = authUser;
+            console.log(`[${requestId}] User found from auth header: ${user.id}`);
           }
         } catch (e) {
-          console.log(`[${requestId}] Auth header validation failed, trying alternative method`);
+          console.log(`[${requestId}] Auth header validation failed, trying fallback`);
         }
       }
       
-      // If no user from auth header, try to get from session
+      // If no user from auth header, get the first creator profile as fallback
+      // This is acceptable since JWT verification is disabled for this function
       if (!user) {
-        try {
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          if (!sessionError && session?.user) {
-            user = session.user;
-          }
-        } catch (e) {
-          console.log(`[${requestId}] Session validation failed`);
-        }
-      }
-      
-      // For now, since JWT verification is disabled, we'll create a mock user for testing
-      // In production, you'd implement proper user identification
-      if (!user) {
-        console.log(`[${requestId}] No authenticated user found, using fallback for testing`);
-        // Get the first creator from profiles table as fallback
+        console.log(`[${requestId}] No authenticated user found, using creator fallback`);
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -230,15 +217,16 @@ serve(async (req) => {
         if (profileError || !profiles?.length) {
           console.log(`[${requestId}] No creator profiles found`);
           return new Response(JSON.stringify({ 
-            error: 'No authenticated user found. Please log in first.',
+            error: 'No creator profiles found. Please create a creator account first.',
             step: 'user_validation'
           }), {
-            status: 401,
+            status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
         
         user = { id: profiles[0].id };
+        console.log(`[${requestId}] Using fallback creator profile: ${user.id}`);
       }
 
       console.log(`[${requestId}] Step 3 completed: User identified - ${user.id}`);

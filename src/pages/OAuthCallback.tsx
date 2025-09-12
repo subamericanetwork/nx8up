@@ -8,74 +8,110 @@ export default function OAuthCallback() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const code = searchParams.get('code');
-    const errorParam = searchParams.get('error');
-    const state = searchParams.get('state');
-    
-    // Extract platform from state
-    let platform = 'youtube'; // default
-    if (state && state.includes('|')) {
-      platform = state.split('|')[1];
-    }
+    const handleOAuthCallback = () => {
+      const code = searchParams.get('code');
+      const errorParam = searchParams.get('error');
+      const state = searchParams.get('state');
+      
+      console.log('OAuth callback URL params:', {
+        code: !!code,
+        error: errorParam,
+        state,
+        fullURL: window.location.href,
+        searchParams: Object.fromEntries(searchParams.entries())
+      });
+      
+      // Extract platform from state parameter
+      let platform = 'youtube'; // default fallback
+      if (state && state.includes('|')) {
+        const parts = state.split('|');
+        platform = parts[1] || 'youtube';
+        console.log('Extracted platform from state:', platform);
+      }
 
-    console.log('OAuth callback page loaded:', { code: !!code, error: errorParam, platform });
+      console.log('OAuth callback page loaded:', { 
+        hasCode: !!code, 
+        error: errorParam, 
+        platform,
+        codeLength: code?.length || 0
+      });
 
-    if (errorParam) {
-      setStatus('error');
-      setError(errorParam);
+      if (errorParam) {
+        console.error('OAuth error parameter:', errorParam);
+        setStatus('error');
+        setError(errorParam);
+        sendMessageToParent({
+          type: 'OAUTH_CALLBACK',
+          error: errorParam,
+          platform
+        });
+        return;
+      }
+
+      if (!code) {
+        console.error('No authorization code in URL');
+        setStatus('error');
+        setError('No authorization code received');
+        sendMessageToParent({
+          type: 'OAUTH_CALLBACK',
+          error: 'No authorization code received',
+          platform
+        });
+        return;
+      }
+
+      // Complete the OAuth flow
+      completeOAuth(code, platform);
+    };
+
+    // Helper function to send messages to parent
+    const sendMessageToParent = (message: any) => {
       if (window.opener) {
         try {
-          window.opener.postMessage({
-            type: 'OAUTH_CALLBACK',
-            error: errorParam,
-            platform
-          }, '*'); // Use '*' for cross-origin messaging
-          window.close();
+          console.log('Sending message to parent:', message);
+          window.opener.postMessage(message, '*');
+          
+          // Also try specific origins
+          const origins = ['https://nx8up.lovable.app', 'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev'];
+          origins.forEach(origin => {
+            try {
+              window.opener.postMessage(message, origin);
+            } catch (e) {
+              console.log('Failed to send to origin:', origin);
+            }
+          });
+          
+          setTimeout(() => {
+            try {
+              window.close();
+            } catch (closeError) {
+              console.log('Could not close window, redirecting instead');
+              window.location.href = '/creator-dashboard';
+            }
+          }, 1000);
         } catch (postMessageError) {
-          console.error('Failed to send error to parent:', postMessageError);
-          window.close();
+          console.error('Failed to send message to parent:', postMessageError);
+          window.location.href = '/creator-dashboard';
         }
+      } else {
+        console.log('No window opener, redirecting to dashboard');
+        window.location.href = '/creator-dashboard';
       }
-      return;
-    }
-
-    if (!code) {
-      setStatus('error');
-      setError('No authorization code received');
-      if (window.opener) {
-        try {
-          window.opener.postMessage({
-            type: 'OAUTH_CALLBACK',
-            error: 'No authorization code received',
-            platform
-          }, '*'); // Use '*' for cross-origin messaging
-          window.close();
-        } catch (postMessageError) {
-          console.error('Failed to send error to parent:', postMessageError);
-          window.close();
-        }
-      }
-      return;
-    }
+    };
 
     // Complete the OAuth flow by calling the edge function
-    const completeOAuth = async () => {
+    const completeOAuth = async (code: string, platform: string) => {
       try {
         console.log('Calling edge function to complete OAuth...');
-        
-        // Get current user session for the authorization header
-        const { data: { session } } = await supabase.auth.getSession();
+        setStatus('processing');
         
         console.log('Request details:', {
           action: 'callback',
           platform,
           code: code ? `${code.substring(0, 20)}...` : 'MISSING',
-          redirect_url: `${window.location.origin}/oauth/callback`,
-          session_exists: !!session
+          redirect_url: 'https://nx8up.lovable.app/oauth/callback',
+          codeLength: code.length
         });
-        
-        // Session is not required since JWT verification is disabled
-        console.log('Proceeding without session validation (JWT verification disabled)');
 
         const { data, error } = await supabase.functions.invoke('social-oauth', {
           body: {
@@ -84,7 +120,6 @@ export default function OAuthCallback() {
             code,
             redirect_url: 'https://nx8up.lovable.app/oauth/callback'
           }
-          // Removed Authorization header since JWT verification is disabled
         });
 
         console.log('Edge function response:', { data, error });
@@ -103,49 +138,14 @@ export default function OAuthCallback() {
         setStatus('success');
         
         // Send success message to parent window
-        if (window.opener) {
-          try {
-            console.log('Sending success message to parent window...');
-            // Try multiple methods for cross-origin communication
-            const message = {
-              type: 'OAUTH_CALLBACK',
-              success: true,
-              account: data.account,
-              platform
-            };
-            
-            // Method 1: Direct postMessage with wildcard origin
-            window.opener.postMessage(message, '*');
-            
-            // Method 2: Try with specific origin if available
-            try {
-              const parentOrigin = document.referrer ? new URL(document.referrer).origin : 'https://nx8up.lovable.app';
-              window.opener.postMessage(message, parentOrigin);
-            } catch (originError) {
-              console.log('Fallback origin message failed:', originError);
-            }
-            
-            // Close the popup after a brief delay
-            setTimeout(() => {
-              try {
-                window.close();
-              } catch (closeError) {
-                console.log('Could not close window, redirecting instead');
-                window.location.href = '/creator-dashboard';
-              }
-            }, 1000);
-          } catch (postMessageError) {
-            console.error('Failed to send message to parent:', postMessageError);
-            // Fallback: redirect to dashboard
-            window.location.href = '/creator-dashboard';
-          }
-        } else {
-          // Fallback: redirect to dashboard
-          console.log('No window opener, redirecting to dashboard');
-          window.location.href = '/creator-dashboard';
-        }
+        sendMessageToParent({
+          type: 'OAUTH_CALLBACK',
+          success: true,
+          account: data.account,
+          platform
+        });
         
-      } catch (err) {
+      } catch (err: any) {
         console.error('OAuth completion error:', err);
         console.error('Error details:', {
           name: err.name,
@@ -156,52 +156,15 @@ export default function OAuthCallback() {
         setError(err.message || 'Failed to complete OAuth');
         
         // Send error message to parent window
-        if (window.opener) {
-          try {
-            console.log('Sending error message to parent window...');
-            const errorMessage = {
-              type: 'OAUTH_CALLBACK',
-              error: err.message || 'Failed to complete OAuth',
-              platform
-            };
-            
-            // Try multiple methods for cross-origin communication
-            window.opener.postMessage(errorMessage, '*');
-            
-            try {
-              const parentOrigin = document.referrer ? new URL(document.referrer).origin : 'https://nx8up.lovable.app';
-              window.opener.postMessage(errorMessage, parentOrigin);
-            } catch (originError) {
-              console.log('Fallback origin message failed:', originError);
-            }
-            
-            setTimeout(() => {
-              try {
-                window.close();
-              } catch (closeError) {
-                console.log('Could not close window, redirecting instead');
-                window.location.href = '/creator-dashboard';
-              }
-            }, 1000);
-          } catch (postMessageError) {
-            console.error('Failed to send error to parent:', postMessageError);
-            setTimeout(() => {
-              try {
-                window.close();
-              } catch (closeError) {
-                console.log('Could not close window, redirecting instead');
-                window.location.href = '/creator-dashboard';
-              }
-            }, 1000);
-          }
-        } else {
-          console.log('No window opener, redirecting to dashboard');
-          window.location.href = '/creator-dashboard';
-        }
+        sendMessageToParent({
+          type: 'OAUTH_CALLBACK',
+          error: err.message || 'Failed to complete OAuth',
+          platform
+        });
       }
     };
 
-    completeOAuth();
+    handleOAuthCallback();
   }, [searchParams]);
 
   return (
@@ -210,7 +173,7 @@ export default function OAuthCallback() {
         {status === 'processing' && (
           <>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Connecting your YouTube account...</p>
+            <p className="text-muted-foreground">Connecting your account...</p>
           </>
         )}
         {status === 'success' && (

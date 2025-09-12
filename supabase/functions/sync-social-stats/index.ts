@@ -172,8 +172,49 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     
     // Get decrypted tokens using secure function
     console.log('Getting secure social tokens...');
-    const { data: tokenData, error: tokenError } = await supabase
-      .rpc('get_secure_social_tokens', { account_id: account.id });
+    
+    // Try the new secure function first
+    let tokenData = null;
+    let tokenError = null;
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_secure_social_tokens', { account_id: account.id });
+      tokenData = data;
+      tokenError = error;
+    } catch (rpcError) {
+      console.log('Secure function failed, trying direct token access:', rpcError);
+      
+      // Fallback: try to get tokens directly from the account record
+      const { data: accountWithTokens, error: accountError } = await supabase
+        .from('social_media_accounts')
+        .select('encrypted_access_token, encrypted_refresh_token')
+        .eq('id', account.id)
+        .single();
+        
+      if (accountError) {
+        throw new Error(`Could not retrieve account tokens: ${accountError.message}`);
+      }
+      
+      if (!accountWithTokens?.encrypted_access_token) {
+        throw new Error('No access token found. Please reconnect your YouTube account.');
+      }
+      
+      // Try to decrypt the token using the decrypt function
+      try {
+        const { data: decryptedToken, error: decryptError } = await supabase
+          .rpc('decrypt_token', { encrypted_token: accountWithTokens.encrypted_access_token });
+          
+        if (decryptError || !decryptedToken) {
+          throw new Error('Could not decrypt access token. Please reconnect your account.');
+        }
+        
+        tokenData = [{ access_token: decryptedToken }];
+      } catch (decryptErr) {
+        console.error('Token decryption failed:', decryptErr);
+        throw new Error('Token decryption failed. Please reconnect your YouTube account.');
+      }
+    }
     
     console.log('Token retrieval result:', { 
       success: !!tokenData, 

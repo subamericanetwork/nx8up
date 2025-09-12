@@ -258,28 +258,32 @@ export default function SocialMediaConnections() {
 
   const handleDisconnect = async (accountId: string, platform: string) => {
     try {
-      const { error } = await supabase
+      console.log('Disconnecting account:', { accountId, platform });
+      
+      // Instead of just setting is_active to false, actually delete the account and tokens
+      const { error: deleteError } = await supabase
         .from('social_media_accounts')
-        .update({ is_active: false })
+        .delete()
         .eq('id', accountId);
 
-      if (error) throw error;
+      if (deleteError) {
+        console.error('Error deleting account:', deleteError);
+        throw deleteError;
+      }
 
-      setAccounts(accounts.map(account => 
-        account.id === accountId 
-          ? { ...account, is_active: false }
-          : account
-      ));
+      // Remove from local state
+      setAccounts(accounts.filter(account => account.id !== accountId));
 
+      console.log('Account disconnected successfully');
       toast({
         title: 'Account Disconnected',
-        description: `${platformConfig[platform as keyof typeof platformConfig]?.name} account has been disconnected`
+        description: `${platformConfig[platform as keyof typeof platformConfig]?.name} account has been disconnected and removed`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error disconnecting account:', error);
       toast({
         title: 'Error',
-        description: 'Failed to disconnect account',
+        description: `Failed to disconnect account: ${error.message}`,
         variant: 'destructive'
       });
     }
