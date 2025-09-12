@@ -1,7 +1,7 @@
 project_id = "plankbahpovnmigfndqr"
 
 [functions.sync-social-stats]
-verify_jwt = true
+verify_jwt = false
 
 [functions.social-oauth]
 verify_jwt = false

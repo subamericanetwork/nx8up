@@ -166,16 +166,28 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Get decrypted tokens directly using the service role client
+    console.log('Attempting to decrypt access token...');
     const { data: accessTokenResult, error: accessTokenError } = await supabase
       .rpc('decrypt_token', { encrypted_token: account.encrypted_access_token });
     
-    if (accessTokenError || !accessTokenResult) {
-      throw new Error('Could not decrypt access token for YouTube account');
+    console.log('Token decryption result:', { 
+      success: !!accessTokenResult, 
+      error: accessTokenError?.message,
+      hasEncryptedToken: !!account.encrypted_access_token 
+    });
+    
+    if (accessTokenError) {
+      console.error('Token decryption error:', accessTokenError);
+      throw new Error(`Could not decrypt access token: ${accessTokenError.message}`);
+    }
+    
+    if (!accessTokenResult) {
+      throw new Error('No access token returned from decryption');
     }
     
     const accessToken = accessTokenResult;
-    if (!accessToken) {
-      throw new Error('No access token available for YouTube account');
+    if (!accessToken || accessToken.trim() === '') {
+      throw new Error('Access token is empty after decryption');
     }
     
     console.log('Successfully retrieved decrypted access token for YouTube API');
