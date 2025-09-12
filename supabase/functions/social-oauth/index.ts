@@ -99,7 +99,7 @@ serve(async (req) => {
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       authUrl.searchParams.set('client_id', clientId!);
       authUrl.searchParams.set('redirect_uri', `${redirectUrl}?platform=youtube`);
-      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/yt-analytics.readonly');
+      authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile');
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('state', crypto.randomUUID());
 
@@ -145,12 +145,22 @@ serve(async (req) => {
       });
 
       console.log('Token exchange response status:', tokenResponse.status);
+      console.log('Token exchange headers:', Object.fromEntries(tokenResponse.headers.entries()));
       
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
-        console.log('Token exchange failed:', errorText);
+        console.log('Token exchange failed with details:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          error: errorText,
+          redirect_uri: `${redirectUrl}?platform=youtube`,
+          has_client_id: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+          has_client_secret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
+          code_length: code?.length
+        });
         return new Response(JSON.stringify({ 
-          error: `Token exchange failed: ${errorText}` 
+          error: `Token exchange failed: ${tokenResponse.status} - ${errorText}`,
+          details: 'OAuth callback error - check Google Cloud Console configuration'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -198,10 +208,14 @@ serve(async (req) => {
 
       console.log('Step 4: Getting authenticated user...');
       const authHeader = req.headers.get('Authorization');
+      console.log('Auth header present:', !!authHeader);
+      console.log('All headers:', Object.fromEntries(req.headers.entries()));
+      
       if (!authHeader) {
-        console.log('ERROR: No authorization header');
+        console.log('ERROR: No authorization header in callback request');
         return new Response(JSON.stringify({ 
-          error: 'No authorization header' 
+          error: 'Missing authorization header',
+          details: 'User session not found during OAuth callback'
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -212,10 +226,21 @@ serve(async (req) => {
         authHeader.replace('Bearer ', '')
       );
 
+      console.log('Supabase auth result:', { 
+        hasUser: !!user, 
+        userId: user?.id,
+        authError: authError?.message 
+      });
+
       if (authError || !user) {
-        console.log('Authentication failed:', authError?.message);
+        console.log('Authentication failed with details:', {
+          authError: authError?.message,
+          hasUser: !!user,
+          headerLength: authHeader?.length
+        });
         return new Response(JSON.stringify({ 
-          error: 'Invalid user token' 
+          error: 'Invalid user token',
+          details: authError?.message || 'User authentication failed'
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
