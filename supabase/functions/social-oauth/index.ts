@@ -38,7 +38,7 @@ serve(async (req) => {
     console.log('=== CREATING SUPABASE CLIENT ===');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_ANON_KEY') || ''
+      Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || ''
     );
     console.log('Supabase client created successfully');
 
