@@ -153,7 +153,7 @@ const handler = async (req: Request): Promise<Response> => {
 // These are placeholder implementations - in production, you'd integrate with actual APIs
 
 async function fetchYouTubeStats(account: any): Promise<SocialStats> {
-  console.log(`Fetching real YouTube stats for ${account.username}`);
+  console.log(`Fetching comprehensive YouTube stats for ${account.username}`);
   
   try {
     // Use the decryption function to get the actual access token
@@ -176,9 +176,9 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     
     console.log('Successfully retrieved decrypted access token for YouTube API');
     
-    // Get channel information
+    // Get channel information with comprehensive stats
     const channelResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&mine=true`,
+      `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet,brandingSettings,contentDetails&mine=true`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -194,11 +194,11 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
         statusText: channelResponse.statusText,
         error: errorText
       });
-      throw new Error(`YouTube API error: ${channelResponse.status} ${channelResponse.statusText}`);
+      throw new Error(`YouTube API error: ${channelResponse.status} ${channelResponse.statusText} - ${errorText}`);
     }
     
     const channelData = await channelResponse.json();
-    console.log('YouTube channel data received:', channelData);
+    console.log('YouTube channel data received for:', channelData.items?.[0]?.snippet?.title);
     
     if (!channelData.items || channelData.items.length === 0) {
       throw new Error('No YouTube channel found for this account');
@@ -206,10 +206,13 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     
     const channel = channelData.items[0];
     const stats = channel.statistics;
+    const channelId = channel.id;
     
-    // Get recent videos for engagement calculation
+    console.log('Channel stats from API:', stats);
+    
+    // Get recent videos for better engagement metrics (last 50 videos)
     const videosResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&type=video&order=date&maxResults=10`,
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -221,17 +224,19 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     let totalVideos = parseInt(stats.videoCount || '0');
     let totalViews = parseInt(stats.viewCount || '0');
     let totalLikes = 0;
-    let totalComments = parseInt(stats.commentCount || '0');
+    let totalComments = 0;
+    let recentVideoEngagement = 0;
     
     if (videosResponse.ok) {
       const videosData = await videosResponse.json();
+      console.log(`Found ${videosData.items?.length || 0} recent videos`);
       
-      // Get statistics for recent videos to calculate engagement
+      // Get statistics for recent videos to calculate accurate engagement
       if (videosData.items && videosData.items.length > 0) {
         const videoIds = videosData.items.map((item: any) => item.id.videoId).join(',');
         
         const videoStatsResponse = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}`,
+          `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${videoIds}`,
           {
             headers: {
               'Authorization': `Bearer ${accessToken}`,
@@ -242,37 +247,120 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
         
         if (videoStatsResponse.ok) {
           const videoStatsData = await videoStatsResponse.json();
+          console.log(`Got detailed stats for ${videoStatsData.items?.length || 0} videos`);
           
-          totalLikes = videoStatsData.items?.reduce((sum: number, video: any) => {
-            return sum + parseInt(video.statistics?.likeCount || '0');
-          }, 0) || 0;
+          // Calculate engagement from recent videos
+          let recentLikes = 0;
+          let recentComments = 0;
+          let recentViews = 0;
+          
+          videoStatsData.items?.forEach((video: any) => {
+            const videoStats = video.statistics;
+            recentLikes += parseInt(videoStats?.likeCount || '0');
+            recentComments += parseInt(videoStats?.commentCount || '0');
+            recentViews += parseInt(videoStats?.viewCount || '0');
+          });
+          
+          // Use recent video engagement for more accurate metrics
+          totalLikes = recentLikes;
+          totalComments = recentComments;
+          
+          // Calculate engagement rate based on recent performance
+          // (likes + comments) / views for recent videos * 100
+          recentVideoEngagement = recentViews > 0 ? 
+            ((recentLikes + recentComments) / recentViews) * 100 : 0;
+            
+          console.log('Recent video engagement metrics:', {
+            videos: videoStatsData.items?.length,
+            likes: recentLikes,
+            comments: recentComments,
+            views: recentViews,
+            engagementRate: recentVideoEngagement
+          });
         }
       }
     }
     
+    // Try to get YouTube Analytics data for better metrics (if scope available)
+    let analyticsEngagement = 0;
+    try {
+      // Get last 30 days analytics if available
+      const endDate = new Date().toISOString().split('T')[0];
+      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      const analyticsResponse = await fetch(
+        `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel%3D%3DMINE&startDate=${startDate}&endDate=${endDate}&metrics=views%2Clikes%2Ccomments%2CaverageViewDuration%2CsubscribersGained&dimensions=day`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+      
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json();
+        console.log('YouTube Analytics data available:', !!analyticsData.rows);
+        
+        if (analyticsData.rows && analyticsData.rows.length > 0) {
+          // Calculate 30-day engagement from analytics
+          let period30DayViews = 0;
+          let period30DayLikes = 0;
+          let period30DayComments = 0;
+          
+          analyticsData.rows.forEach((row: any[]) => {
+            period30DayViews += row[1] || 0;  // views
+            period30DayLikes += row[2] || 0;  // likes
+            period30DayComments += row[3] || 0;  // comments
+          });
+          
+          analyticsEngagement = period30DayViews > 0 ? 
+            ((period30DayLikes + period30DayComments) / period30DayViews) * 100 : 0;
+          
+          console.log('30-day analytics engagement:', analyticsEngagement);
+        }
+      }
+    } catch (analyticsError) {
+      console.log('YouTube Analytics not available (may need additional permissions):', analyticsError);
+    }
+    
     const subscriberCount = parseInt(stats.subscriberCount || '0');
-    const avgLikesPerPost = totalVideos > 0 ? Math.floor(totalLikes / totalVideos) : 0;
-    const avgCommentsPerPost = totalVideos > 0 ? Math.floor(totalComments / totalVideos) : 0;
+    const avgLikesPerPost = totalVideos > 0 ? Math.floor(totalLikes / Math.min(50, totalVideos)) : 0;
+    const avgCommentsPerPost = totalVideos > 0 ? Math.floor(totalComments / Math.min(50, totalVideos)) : 0;
     
-    // Calculate engagement rate: (likes + comments) / subscribers * 100
-    const engagementRate = subscriberCount > 0 ? 
-      ((totalLikes + totalComments) / subscriberCount) * 100 : 0;
+    // Use the best available engagement rate (prioritize analytics > recent videos > fallback)
+    let finalEngagementRate = 0;
+    if (analyticsEngagement > 0) {
+      finalEngagementRate = analyticsEngagement;
+      console.log('Using YouTube Analytics engagement rate:', finalEngagementRate);
+    } else if (recentVideoEngagement > 0) {
+      finalEngagementRate = recentVideoEngagement;
+      console.log('Using recent video engagement rate:', finalEngagementRate);
+    } else if (subscriberCount > 0) {
+      // Fallback: total engagement vs subscribers
+      finalEngagementRate = ((totalLikes + totalComments) / subscriberCount) * 100;
+      console.log('Using fallback engagement calculation:', finalEngagementRate);
+    }
     
-    console.log(`Successfully fetched YouTube stats for ${account.username}:`, {
+    
+    console.log(`Successfully fetched comprehensive YouTube stats for ${account.username}:`, {
       subscribers: subscriberCount,
       videos: totalVideos,
       views: totalViews,
       likes: totalLikes,
-      engagement: engagementRate
+      comments: totalComments,
+      engagement: finalEngagementRate,
+      avgLikesPerVideo: avgLikesPerPost,
+      avgCommentsPerVideo: avgCommentsPerPost
     });
     
     return {
       followers_count: subscriberCount,
-      following_count: 0, // YouTube doesn't have a "following" concept
+      following_count: 0, // YouTube doesn't have a "following" concept for channels
       posts_count: totalVideos,
       likes_count: totalLikes,
       views_count: totalViews,
-      engagement_rate: Math.min(Math.round(engagementRate * 100) / 100, 100), // Cap at 100% and round to 2 decimals
+      engagement_rate: Math.min(Math.round(finalEngagementRate * 100) / 100, 100), // Cap at 100% and round to 2 decimals
       avg_likes_per_post: avgLikesPerPost,
       avg_comments_per_post: avgCommentsPerPost
     };
@@ -280,24 +368,17 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
   } catch (error) {
     console.error('Error fetching YouTube stats:', error);
     
-    // Return fallback mock data if API fails, but log the error
-    console.log('Falling back to mock data due to API error');
+    // Provide more informative error for debugging
+    if (error.message?.includes('YouTube API error: 403')) {
+      throw new Error('YouTube API access denied. Channel may not have sufficient permissions or analytics access.');
+    } else if (error.message?.includes('YouTube API error: 401')) {
+      throw new Error('YouTube access token expired. Please reconnect your YouTube account.');
+    } else if (error.message?.includes('YouTube API error: 400')) {
+      throw new Error('Invalid YouTube API request. Please check your channel settings.');
+    }
     
-    const baseFollowers = 1200 + Math.floor(Math.random() * 800);
-    const basePosts = 25 + Math.floor(Math.random() * 15);
-    const baseLikes = baseFollowers * 0.05 * basePosts;
-    const baseViews = baseLikes * 20;
-    
-    return {
-      followers_count: baseFollowers,
-      following_count: 0,
-      posts_count: basePosts,
-      likes_count: Math.floor(baseLikes),
-      views_count: Math.floor(baseViews),
-      engagement_rate: Math.round((3.5 + Math.random() * 2) * 100) / 100,
-      avg_likes_per_post: Math.floor(baseLikes / basePosts),
-      avg_comments_per_post: Math.floor((baseLikes / basePosts) * 0.1)
-    };
+    // Re-throw the original error for other cases
+    throw error;
   }
 }
 
