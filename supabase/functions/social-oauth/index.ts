@@ -155,11 +155,15 @@ serve(async (req) => {
       console.log('All validations passed - proceeding with callback...');
       
       try {
+        console.log('=== STARTING CALLBACK PROCESSING ===');
+        
         // Initialize Supabase client with service role
         const supabase = createClient(
           Deno.env.get('SUPABASE_URL') || '',
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
         );
+        
+        console.log('Supabase client initialized');
 
         // Exchange authorization code for tokens
         const tokenUrl = 'https://oauth2.googleapis.com/token';
@@ -187,8 +191,10 @@ serve(async (req) => {
         });
 
         console.log('Token response status:', tokenResponse.status);
+        console.log('Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
         
         if (!tokenResponse.ok) {
+          console.log('=== TOKEN EXCHANGE FAILED ===');
           console.log('Token exchange failed:', tokenResponse.status, tokenResponse.statusText);
           const errorText = await tokenResponse.text();
           console.log('Token exchange error response:', errorText);
@@ -203,19 +209,32 @@ serve(async (req) => {
         }
 
         const tokens = await tokenResponse.json();
-        console.log('Tokens received successfully');
+        console.log('=== TOKENS RECEIVED SUCCESSFULLY ===');
+        console.log('Token info:', {
+          has_access_token: !!tokens.access_token,
+          has_refresh_token: !!tokens.refresh_token,
+          expires_in: tokens.expires_in,
+          token_type: tokens.token_type
+        });
 
         // Get user info from Google
+        console.log('=== GETTING USER INFO FROM GOOGLE ===');
         const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: {
             'Authorization': `Bearer ${tokens.access_token}`,
           },
         });
 
+        console.log('User info response status:', userInfoResponse.status);
+        
         if (!userInfoResponse.ok) {
+          console.log('=== FAILED TO GET USER INFO ===');
           console.log('Failed to get user info:', userInfoResponse.status);
+          const errorText = await userInfoResponse.text();
+          console.log('User info error:', errorText);
           return new Response(JSON.stringify({ 
-            error: 'Failed to get user info' 
+            error: 'Failed to get user info',
+            details: errorText
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -223,19 +242,33 @@ serve(async (req) => {
         }
 
         const userInfo = await userInfoResponse.json();
-        console.log('User info retrieved:', userInfo.name);
+        console.log('=== USER INFO RETRIEVED ===');
+        console.log('User info:', {
+          id: userInfo.id,
+          name: userInfo.name,
+          email: userInfo.email
+        });
 
         // Get YouTube channel info
+        console.log('=== GETTING YOUTUBE CHANNEL INFO ===');
         const channelResponse = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
           headers: {
             'Authorization': `Bearer ${tokens.access_token}`,
           },
         });
 
+        console.log('Channel response status:', channelResponse.status);
+        console.log('Channel response headers:', Object.fromEntries(channelResponse.headers.entries()));
+
         if (!channelResponse.ok) {
+          console.log('=== FAILED TO GET CHANNEL INFO ===');
           console.log('Failed to get channel info:', channelResponse.status);
+          const errorText = await channelResponse.text();
+          console.log('Channel error response:', errorText);
           return new Response(JSON.stringify({ 
-            error: 'Failed to get YouTube channel info' 
+            error: 'Failed to get YouTube channel info',
+            details: errorText,
+            status: channelResponse.status
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -243,10 +276,19 @@ serve(async (req) => {
         }
 
         const channelData = await channelResponse.json();
+        console.log('=== CHANNEL DATA RECEIVED ===');
+        console.log('Channel data structure:', {
+          items_count: channelData.items?.length || 0,
+          pageInfo: channelData.pageInfo,
+          has_items: !!channelData.items
+        });
         
         if (!channelData.items || channelData.items.length === 0) {
+          console.log('=== NO YOUTUBE CHANNEL FOUND ===');
+          console.log('Channel data:', channelData);
           return new Response(JSON.stringify({ 
-            error: 'No YouTube channel found for this account' 
+            error: 'No YouTube channel found for this account',
+            details: 'The authenticated Google account does not have an associated YouTube channel'
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -254,45 +296,71 @@ serve(async (req) => {
         }
 
         const channel = channelData.items[0];
-        console.log('Channel info retrieved:', channel.snippet.title);
+        console.log('=== CHANNEL INFO RETRIEVED ===');
+        console.log('Channel info:', {
+          id: channel.id,
+          title: channel.snippet.title,
+          customUrl: channel.snippet.customUrl,
+          publishedAt: channel.snippet.publishedAt
+        });
 
         // Get user ID from authorization header
+        console.log('=== VALIDATING USER AUTHORIZATION ===');
         const authHeader = req.headers.get('authorization');
+        console.log('Auth header present:', !!authHeader);
+        
         if (!authHeader) {
+          console.log('=== NO AUTHORIZATION HEADER ===');
           return new Response(JSON.stringify({ 
-            error: 'Authorization required' 
+            error: 'Authorization required - no auth header provided' 
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser(
-          authHeader.replace('Bearer ', '')
-        );
+        const token = authHeader.replace('Bearer ', '');
+        console.log('Extracted token:', token.substring(0, 20) + '...');
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+        console.log('User validation result:', {
+          user_id: user?.id,
+          has_error: !!userError,
+          error_message: userError?.message
+        });
 
         if (userError || !user) {
+          console.log('=== USER VALIDATION FAILED ===');
           console.log('User validation error:', userError);
           return new Response(JSON.stringify({ 
-            error: 'Invalid user token' 
+            error: 'Invalid user token',
+            details: userError?.message
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
-        console.log('Creating social media account...');
+        console.log('=== USER VALIDATED SUCCESSFULLY ===');
+        console.log('User ID:', user.id);
+
+        console.log('=== CREATING SOCIAL MEDIA ACCOUNT ===');
         
         // Ensure we have valid required fields
         const username = channel.snippet.customUrl || channel.snippet.title || `channel-${channel.id}`;
         const displayName = channel.snippet.title || 'YouTube Channel';
         
-        console.log('Account data:', {
+        console.log('Account data to insert:', {
           creator_id: user.id,
           platform: 'youtube',
           platform_user_id: channel.id,
           username: username,
           display_name: displayName,
+          profile_image_url: channel.snippet.thumbnails?.default?.url,
+          is_active: true,
+          token_expires_at: tokens.expires_in ? 
+            new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
         });
 
         // Create or update social media account
@@ -316,37 +384,62 @@ serve(async (req) => {
           .select()
           .single();
 
-        console.log('Account creation result:', { account: !!account, error: accountError });
+        console.log('Account upsert result:', { 
+          has_account: !!account, 
+          has_error: !!accountError,
+          account_id: account?.id,
+          error_message: accountError?.message,
+          error_code: accountError?.code,
+          error_details: accountError?.details
+        });
 
         if (accountError) {
-          console.log('Account creation error details:', accountError);
+          console.log('=== ACCOUNT CREATION FAILED ===');
+          console.log('Full account error:', JSON.stringify(accountError, null, 2));
           return new Response(JSON.stringify({ 
             error: 'Failed to create social media account',
             details: accountError.message,
-            code: accountError.code
+            code: accountError.code,
+            hint: accountError.hint
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
+        console.log('=== ACCOUNT CREATED SUCCESSFULLY ===');
+        console.log('Account ID:', account.id);
+
         // Store encrypted tokens using secure function
+        console.log('=== STORING ENCRYPTED TOKENS ===');
+        console.log('Calling update_encrypted_tokens with account ID:', account.id);
+        
         const { error: tokenError } = await supabase.rpc('update_encrypted_tokens', {
           account_id: account.id,
           new_access_token: tokens.access_token,
           new_refresh_token: tokens.refresh_token || null
         });
 
+        console.log('Token storage result:', {
+          has_error: !!tokenError,
+          error_message: tokenError?.message,
+          error_code: tokenError?.code
+        });
+
         if (tokenError) {
-          console.log('Token storage error:', tokenError);
+          console.log('=== TOKEN STORAGE FAILED ===');
+          console.log('Full token error:', JSON.stringify(tokenError, null, 2));
           return new Response(JSON.stringify({ 
             error: 'Failed to store tokens',
-            details: tokenError.message
+            details: tokenError.message,
+            code: tokenError.code
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
+
+        console.log('=== TOKENS STORED SUCCESSFULLY ===');
 
         console.log('OAuth callback completed successfully');
 
