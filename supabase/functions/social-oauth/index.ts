@@ -282,12 +282,17 @@ serve(async (req) => {
         }
 
         console.log('Creating social media account...');
+        
+        // Ensure we have valid required fields
+        const username = channel.snippet.customUrl || channel.snippet.title || `channel-${channel.id}`;
+        const displayName = channel.snippet.title || 'YouTube Channel';
+        
         console.log('Account data:', {
           creator_id: user.id,
           platform: 'youtube',
           platform_user_id: channel.id,
-          username: channel.snippet.customUrl || channel.snippet.title,
-          display_name: channel.snippet.title,
+          username: username,
+          display_name: displayName,
         });
 
         // Create or update social media account
@@ -297,8 +302,8 @@ serve(async (req) => {
             creator_id: user.id,
             platform: 'youtube',
             platform_user_id: channel.id,
-            username: channel.snippet.customUrl || channel.snippet.title,
-            display_name: channel.snippet.title,
+            username: username,
+            display_name: displayName,
             profile_image_url: channel.snippet.thumbnails?.default?.url,
             is_active: true,
             connected_at: new Date().toISOString(),
