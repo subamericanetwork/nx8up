@@ -189,7 +189,7 @@ export default function SocialMediaStats() {
   const handleSyncStats = async (accountId: string, platform: string) => {
     setSyncing(accountId);
     try {
-      console.log(`Syncing stats for ${platform} account:`, accountId);
+      console.log(`🔄 Syncing stats for ${platform} account:`, accountId);
       
       // Call edge function to sync stats
       const { data, error } = await supabase.functions.invoke('sync-social-stats', {
