@@ -24,12 +24,17 @@ export default function OAuthCallback() {
       setStatus('error');
       setError(errorParam);
       if (window.opener) {
-        window.opener.postMessage({
-          type: 'OAUTH_CALLBACK',
-          error: errorParam,
-          platform
-        }, window.location.origin);
-        window.close();
+        try {
+          window.opener.postMessage({
+            type: 'OAUTH_CALLBACK',
+            error: errorParam,
+            platform
+          }, '*'); // Use '*' for cross-origin messaging
+          window.close();
+        } catch (postMessageError) {
+          console.error('Failed to send error to parent:', postMessageError);
+          window.close();
+        }
       }
       return;
     }
@@ -38,12 +43,17 @@ export default function OAuthCallback() {
       setStatus('error');
       setError('No authorization code received');
       if (window.opener) {
-        window.opener.postMessage({
-          type: 'OAUTH_CALLBACK',
-          error: 'No authorization code received',
-          platform
-        }, window.location.origin);
-        window.close();
+        try {
+          window.opener.postMessage({
+            type: 'OAUTH_CALLBACK',
+            error: 'No authorization code received',
+            platform
+          }, '*'); // Use '*' for cross-origin messaging
+          window.close();
+        } catch (postMessageError) {
+          console.error('Failed to send error to parent:', postMessageError);
+          window.close();
+        }
       }
       return;
     }
@@ -97,17 +107,23 @@ export default function OAuthCallback() {
         
         // Send success message to parent window
         if (window.opener) {
-          window.opener.postMessage({
-            type: 'OAUTH_CALLBACK',
-            success: true,
-            account: data.account,
-            platform
-          }, window.location.origin);
-          
-          // Close the popup after a brief delay
-          setTimeout(() => {
-            window.close();
-          }, 1000);
+          try {
+            window.opener.postMessage({
+              type: 'OAUTH_CALLBACK',
+              success: true,
+              account: data.account,
+              platform
+            }, '*'); // Use '*' for cross-origin messaging
+            
+            // Close the popup after a brief delay
+            setTimeout(() => {
+              window.close();
+            }, 1000);
+          } catch (postMessageError) {
+            console.error('Failed to send message to parent:', postMessageError);
+            // Fallback: redirect to dashboard
+            window.location.href = '/creator-dashboard';
+          }
         } else {
           // Fallback: redirect to dashboard
           window.location.href = '/creator-dashboard';
@@ -125,12 +141,17 @@ export default function OAuthCallback() {
         
         // Send error message to parent window
         if (window.opener) {
-          window.opener.postMessage({
-            type: 'OAUTH_CALLBACK',
-            error: err.message || 'Failed to complete OAuth',
-            platform
-          }, window.location.origin);
-          window.close();
+          try {
+            window.opener.postMessage({
+              type: 'OAUTH_CALLBACK',
+              error: err.message || 'Failed to complete OAuth',
+              platform
+            }, '*'); // Use '*' for cross-origin messaging
+            window.close();
+          } catch (postMessageError) {
+            console.error('Failed to send error to parent:', postMessageError);
+            window.close();
+          }
         }
       }
     };
