@@ -184,10 +184,16 @@ export default function SocialMediaStats() {
   };
 
   const handleConnectAccount = async (platform: string) => {
-    console.log('=== CONNECT ACCOUNT CLICKED (SocialMediaStats) ===', { platform, user: !!user });
+    console.log('=== CONNECT ACCOUNT CLICKED (SocialMediaStats) ===', { 
+      platform, 
+      user: !!user, 
+      userId: user?.id,
+      currentURL: window.location.href
+    });
     
     try {
       // Call OAuth function to get auth URL
+      console.log('About to call supabase function social-oauth...');
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: {
           action: 'connect',

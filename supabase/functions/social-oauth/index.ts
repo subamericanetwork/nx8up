@@ -161,7 +161,10 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Social OAuth function called');
+    console.log('=== SOCIAL OAUTH FUNCTION CALLED ===');
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Headers:', req.headers);
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
