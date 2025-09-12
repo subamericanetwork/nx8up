@@ -78,6 +78,8 @@ const exchangeCodeForToken = async (platform: string, code: string, config: OAut
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Token exchange failed:', response.status, errorText);
     throw new Error(`Token exchange failed: ${response.statusText}`);
   }
 
@@ -216,23 +218,6 @@ serve(async (req) => {
       actual_redirect_url: actualRedirectUrl
     });
 
-    // Validate required parameters
-    if (!action || !platform) {
-      console.error('Missing required parameters:', { action, platform });
-      throw new Error('Missing required parameters: action and platform');
-    }
-
-    // Auto-detect the correct domain from the request headers
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '');
-    const actualRedirectUrl = redirect_url || `${origin}/creator-dashboard`;
-    
-    console.log('Domain detection:', {
-      origin,
-      referer: req.headers.get('referer'),
-      provided_redirect_url: redirect_url,
-      actual_redirect_url: actualRedirectUrl
-    });
-
     // Check if required environment variables exist
     const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
     const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
@@ -286,7 +271,7 @@ serve(async (req) => {
         throw new Error('Authorization code not provided');
       }
 
-      const config = getOAuthConfig(platform, redirect_url);
+      const config = getOAuthConfig(platform, actualRedirectUrl);
       if (!config) {
         console.error(`OAuth not configured for platform: ${platform}`);
         throw new Error(`OAuth not configured for ${platform}`);
