@@ -154,7 +154,7 @@ export default function SocialMediaConnections() {
           throw new Error('Popup blocked. Please allow popups for this site and try again.');
         }
         
-        // Set up message listener for OAuth callback
+        // Set up message listener for OAuth callback (backup method)
         const messageListener = (event: MessageEvent) => {
           console.log('🔍 RECEIVED MESSAGE FROM POPUP:', {
             data: event.data,
@@ -163,41 +163,76 @@ export default function SocialMediaConnections() {
             popup_closed: popup?.closed
           });
           
-          // Accept messages from any origin for cross-origin compatibility
           if (event.data?.type === 'OAUTH_CALLBACK') {
-            const { success, error, account, platform: callbackPlatform } = event.data;
-            
-            // Clean up immediately
-            cleanup();
-            
-            if (error) {
-              console.error('OAuth error from popup:', error);
-              toast({
-                title: 'Connection Failed',
-                description: error || 'OAuth authorization failed',
-                variant: 'destructive'
-              });
-              setConnecting(null);
-              return;
-            }
-
-            if (success && account) {
-              console.log('OAuth success via message:', account);
-              toast({
-                title: 'Connected Successfully!',
-                description: `Your ${account.platform || callbackPlatform || platform} account has been connected`,
-              });
-              setConnecting(null);
-              // Refresh accounts list
-              setTimeout(() => loadConnectedAccounts(), 1000);
-            }
+            handleOAuthResult(event.data);
           }
         };
+        
+        // Primary method: Poll localStorage for OAuth result
+        const pollForResult = () => {
+          try {
+            const result = localStorage.getItem('oauth_result');
+            if (result) {
+              const parsed = JSON.parse(result);
+              
+              // Check if this is a recent result (within last 30 seconds)
+              if (Date.now() - parsed.timestamp < 30000) {
+                console.log('OAuth result found in localStorage:', parsed);
+                localStorage.removeItem('oauth_result'); // Clean up
+                handleOAuthResult(parsed);
+                return true;
+              }
+            }
+          } catch (e) {
+            console.error('Error checking localStorage for OAuth result:', e);
+          }
+          return false;
+        };
+        
+        // Handle OAuth result from either method
+        const handleOAuthResult = (data: any) => {
+          const { success, error, account, platform: callbackPlatform } = data;
+          
+          // Clean up immediately
+          cleanup();
+          
+          if (error) {
+            console.error('OAuth error:', error);
+            toast({
+              title: 'Connection Failed',
+              description: error || 'OAuth authorization failed',
+              variant: 'destructive'
+            });
+            setConnecting(null);
+            return;
+          }
+
+          if (success && account) {
+            console.log('OAuth success:', account);
+            toast({
+              title: 'Connected Successfully!',
+              description: `Your ${account.platform || callbackPlatform || platform} account has been connected`,
+            });
+            setConnecting(null);
+            // Refresh accounts list
+            setTimeout(() => loadConnectedAccounts(), 1000);
+          }
+        };
+        
+        // Start polling for localStorage result
+        const pollInterval = setInterval(() => {
+          if (pollForResult()) {
+            clearInterval(pollInterval);
+          }
+        }, 1000);
         
         // Cleanup function
         const cleanup = () => {
           if (checkClosed) {
             clearInterval(checkClosed);
+          }
+          if (pollInterval) {
+            clearInterval(pollInterval);
           }
           window.removeEventListener('message', messageListener);
           try {

@@ -76,70 +76,41 @@ export default function OAuthCallback() {
 
     // Helper function to send messages to parent
     const sendMessageToParent = (message: any) => {
+      console.log('Sending message to parent:', message);
+      
+      // Always use localStorage as primary communication method
+      const oauthResult = {
+        ...message,
+        timestamp: Date.now(),
+        platform: message.platform
+      };
+      
+      try {
+        localStorage.setItem('oauth_result', JSON.stringify(oauthResult));
+        console.log('OAuth result stored in localStorage:', oauthResult);
+      } catch (e) {
+        console.error('Failed to store OAuth result in localStorage:', e);
+      }
+      
+      // Try postMessage as backup
       if (window.opener && !window.opener.closed) {
         try {
-          console.log('Sending message to parent:', message);
-          
-          // Try multiple origins for cross-origin compatibility
-          const origins = [
-            '*', // Wildcard first
-            'https://nx8up.lovable.app', 
-            'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev',
-            window.location.origin,
-            'http://localhost:8080',
-            'https://localhost:8080'
-          ];
-          
-          let messageSent = false;
-          origins.forEach(origin => {
-            try {
-              window.opener.postMessage(message, origin);
-              messageSent = true;
-              console.log('Message sent to origin:', origin);
-            } catch (e) {
-              console.log('Failed to send to origin:', origin, e.message);
-            }
-          });
-          
-          if (!messageSent) {
-            console.error('Failed to send message to any origin');
-          }
-          
-          // Close window with better error handling
-          setTimeout(() => {
-            try {
-              // Check if window can be closed
-              if (!window.opener.closed) {
-                console.log('Attempting to close popup window');
-                window.close();
-              }
-            } catch (closeError) {
-              console.log('Could not close window (cross-origin policy):', closeError.message);
-              // Try alternative method
-              try {
-                window.location.replace('/creator-dashboard');
-              } catch (replaceError) {
-                window.location.href = '/creator-dashboard';
-              }
-            }
-          }, 1500);
-        } catch (postMessageError) {
-          console.error('Failed to send message to parent:', postMessageError);
-          // Fallback redirect
-          try {
-            window.location.replace('/creator-dashboard');
-          } catch (replaceError) {
-            window.location.href = '/creator-dashboard';
-          }
-        }
-      } else {
-        console.log('No valid window opener, redirecting to dashboard');
-        try {
-          window.location.replace('/creator-dashboard');
-        } catch (replaceError) {
-          window.location.href = '/creator-dashboard';
+          window.opener.postMessage(message, '*');
+          console.log('Message also sent via postMessage');
+        } catch (e) {
+          console.log('PostMessage failed (expected due to COOP):', e.message);
         }
       }
+      
+      // Close popup or redirect after short delay
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch (closeError) {
+          console.log('Cannot close popup, redirecting:', closeError.message);
+          window.location.href = '/creator-dashboard';
+        }
+      }, 1000);
     };
 
     // Complete the OAuth flow by calling the edge function
