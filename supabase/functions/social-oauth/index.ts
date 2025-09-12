@@ -291,7 +291,19 @@ serve(async (req) => {
       console.log('Account saved successfully:', savedAccount.id);
 
       console.log('Step 6: Saving tokens securely...');
-      const { error: tokenError } = await supabase.rpc('update_encrypted_tokens', {
+      // Create service role client for secure token operations
+      const serviceRoleSupabase = createClient(
+        Deno.env.get('SUPABASE_URL') || '',
+        Deno.env.get('SERVICE_ROLE_KEY') || '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
+      
+      const { error: tokenError } = await serviceRoleSupabase.rpc('update_encrypted_tokens', {
         account_id: savedAccount.id,
         new_access_token: tokenData.access_token,
         new_refresh_token: tokenData.refresh_token
