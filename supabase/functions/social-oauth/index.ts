@@ -17,11 +17,33 @@ serve(async (req) => {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Read and parse request body
-    const body = await req.json();
-    console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2));
+    // Read and parse request body with error handling
+    let body;
+    try {
+      body = await req.json();
+      console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.error(`[${requestId}] Failed to parse request body:`, parseError);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid JSON in request body' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
-    const { action, platform, code } = body;
+    const { action, platform, code, redirect_url } = body;
+
+    // Validate required fields
+    if (!action || !platform) {
+      console.error(`[${requestId}] Missing required fields:`, { action, platform });
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: action and platform' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // ============= CONNECT ACTION =============
     if (action === 'connect') {
@@ -368,14 +390,17 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
-    console.log(`[${requestId}] Function error:`, error.name, error.message);
-    console.log(`[${requestId}] Stack:`, error.stack);
+  } catch (error: any) {
+    console.error(`[${requestId}] OAUTH FUNCTION ERROR:`, {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     
     return new Response(JSON.stringify({ 
-      error: 'Function error',
-      details: error.message,
-      name: error.name
+      error: error.message || 'OAuth function failed',
+      step: 'general_error',
+      requestId: requestId
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
