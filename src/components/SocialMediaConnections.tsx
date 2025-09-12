@@ -108,13 +108,19 @@ export default function SocialMediaConnections() {
       console.log('Starting OAuth flow for platform:', platform);
       console.log('Current window.location.href:', window.location.href);
       console.log('Current window.location.origin:', window.location.origin);
-      console.log('Redirect URL will be:', `${window.location.origin}/creator-dashboard`);
       
+      // Use the production domain for OAuth redirect
+      const redirectUrl = window.location.hostname.includes('sandbox.lovable.dev') 
+        ? 'https://nx8up.loveable.app/creator-dashboard'
+        : `${window.location.origin}/creator-dashboard`;
+        
+      console.log('Redirect URL will be:', redirectUrl);
+        
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
           action: 'connect',
           platform,
-          redirect_url: `${window.location.origin}/creator-dashboard`
+          redirect_url: redirectUrl
         }
       });
 
