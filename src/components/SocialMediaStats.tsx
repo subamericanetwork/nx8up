@@ -223,6 +223,10 @@ export default function SocialMediaStats() {
         errorMessage = 'YouTube API access issue. Try reconnecting your account.';
       } else if (error.message?.includes('access token')) {
         errorMessage = 'Authentication expired. Please reconnect your account.';
+      } else if (error.message?.includes('needs to be reconnected')) {
+        errorMessage = error.message; // Use the specific reconnect message from the function
+      } else if (error.message?.includes('reconnect')) {
+        errorMessage = error.message; // Use any reconnect-related message
       }
       
       toast({

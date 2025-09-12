@@ -41,10 +41,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('Fetching social account with tokens...');
-    // Get the social media account details directly with service role (bypass RPC security issues)
+    // Get the social media account details with encrypted tokens using service role
     const { data: accountData, error: accountError } = await supabase
       .from('social_media_accounts')
-      .select('*')
+      .select('id, creator_id, platform, platform_user_id, username, display_name, profile_image_url, is_active, connected_at, last_synced_at, token_expires_at, encrypted_access_token, encrypted_refresh_token, created_at, updated_at')
       .eq('id', accountId)
       .eq('is_active', true)
       .maybeSingle();
@@ -64,8 +64,16 @@ const handler = async (req: Request): Promise<Response> => {
       id: account.id,
       platform: account.platform, 
       username: account.username,
-      is_active: account.is_active
+      is_active: account.is_active,
+      hasAccessToken: !!account.encrypted_access_token,
+      hasRefreshToken: !!account.encrypted_refresh_token
     });
+
+    // Check if account has access token
+    if (!account.encrypted_access_token) {
+      console.error('Account has no encrypted access token');
+      throw new Error(`Your ${account.platform} account needs to be reconnected. Please disconnect and reconnect your ${account.platform} account in the dashboard to refresh the authentication token.`);
+    }
 
 
     console.log(`Syncing stats for ${account.platform} account: @${account.username}`);
@@ -177,9 +185,7 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     
     // Try direct decryption approach since we have service role access
     try {
-      if (!account.encrypted_access_token) {
-        throw new Error('No access token found. Please reconnect your YouTube account.');
-      }
+      console.log('Attempting to decrypt access token...');
       
       // Use the decrypt_token function directly with service role privileges
       const { data: decryptedToken, error: decryptError } = await supabase
@@ -187,19 +193,24 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
         
       if (decryptError) {
         console.error('Token decryption error:', decryptError);
-        throw new Error(`Could not decrypt access token: ${decryptError.message}`);
+        throw new Error(`Could not decrypt access token: ${decryptError.message}. Please reconnect your YouTube account.`);
       }
       
       if (!decryptedToken || decryptedToken.trim() === '') {
-        throw new Error('Decrypted token is empty. Please reconnect your YouTube account.');
+        console.error('Decrypted token is empty');
+        throw new Error('Decrypted token is empty. Please reconnect your YouTube account to get a fresh token.');
       }
       
       accessToken = decryptedToken;
-      console.log('Successfully decrypted access token');
+      console.log('Successfully decrypted access token, length:', accessToken.length);
       
     } catch (decryptError) {
       console.error('Direct token decryption failed:', decryptError);
-      throw new Error('Could not access tokens. Please reconnect your YouTube account.');
+      if (decryptError.message.includes('decrypt')) {
+        throw new Error('Token decryption failed. Please reconnect your YouTube account to refresh the access token.');
+      } else {
+        throw decryptError;
+      }
     }
     
     console.log('Successfully retrieved decrypted access token for YouTube API');

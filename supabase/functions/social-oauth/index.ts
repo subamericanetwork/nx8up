@@ -290,47 +290,52 @@ serve(async (req) => {
       // Step 5: Store encrypted tokens using secure token function
       console.log(`[${requestId}] Step 5: Storing encrypted tokens securely`);
       
-      // Create service role client for secure token operations
-      const serviceSupabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
-
       try {
-        // Use the secure token storage function
-        console.log(`[${requestId}] Calling secure token update function...`);
-        const { data: tokenResult, error: tokenError } = await serviceSupabase
-          .rpc('secure_update_social_tokens', { 
+        // Direct token update using service role access
+        console.log(`[${requestId}] Updating tokens directly with service role...`);
+        const { error: tokenError } = await supabase
+          .rpc('update_encrypted_tokens', { 
             account_id: account.id,
             new_access_token: tokens.access_token,
-            new_refresh_token: tokens.refresh_token || null,
-            new_expires_at: tokens.expires_in ? 
-              new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+            new_refresh_token: tokens.refresh_token || null
           });
 
-        console.log(`[${requestId}] Secure token storage result:`, { 
-          success: !!tokenResult, 
-          error: tokenError?.message 
-        });
-
         if (tokenError) {
-          console.log(`[${requestId}] Secure token storage failed: ${tokenError.message}`);
-          console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenError, null, 2));
-          
-          // Don't fail the entire flow if token storage fails - just log it
-          console.log(`[${requestId}] WARNING: Token storage failed but continuing with account creation`);
-        } else {
-          console.log(`[${requestId}] Step 5 completed: Tokens stored securely`);
+          console.log(`[${requestId}] Direct token update failed: ${tokenError.message}`);
+          throw new Error(`Failed to store access tokens: ${tokenError.message}`);
         }
+
+        // Update token expiration separately if provided
+        if (tokens.expires_in) {
+          const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+          const { error: expirationError } = await supabase
+            .from('social_media_accounts')
+            .update({ token_expires_at: expiresAt })
+            .eq('id', account.id);
+            
+          if (expirationError) {
+            console.log(`[${requestId}] Token expiration update failed: ${expirationError.message}`);
+          }
+        }
+        
+        console.log(`[${requestId}] Step 5 completed: Tokens stored successfully`);
       } catch (tokenErr) {
-        console.log(`[${requestId}] Token storage error (non-critical):`, tokenErr);
-        // Continue without failing
+        console.error(`[${requestId}] Token storage error:`, tokenErr);
+        
+        // Delete the account if token storage fails since it's unusable
+        await supabase
+          .from('social_media_accounts')
+          .delete()
+          .eq('id', account.id);
+          
+        return new Response(JSON.stringify({ 
+          error: 'Failed to store authentication tokens',
+          details: tokenErr.message,
+          step: 'token_storage'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
       
       // Step 6: Trigger initial stats sync
