@@ -219,22 +219,73 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 4 completed: Account created - ${account.id}`);
 
-      // Step 5: Store encrypted tokens
-      console.log(`[${requestId}] Step 5: Storing encrypted tokens`);
+      // Step 5: Store encrypted tokens using service role client
+      console.log(`[${requestId}] Step 5: Storing encrypted tokens directly`);
       
-      const { error: tokenError } = await supabase.rpc('update_encrypted_tokens', {
-        account_id: account.id,
-        new_access_token: tokens.access_token,
-        new_refresh_token: tokens.refresh_token || null
-      });
+      // Create service role client for secure token operations
+      const serviceSupabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
 
-      if (tokenError) {
-        console.log(`[${requestId}] Token storage failed: ${tokenError.message}`);
-        console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenError, null, 2));
+      // First encrypt the tokens using the database function
+      const { data: encryptedTokens, error: encryptError } = await serviceSupabase
+        .rpc('encrypt_token', { token: tokens.access_token });
+
+      if (encryptError) {
+        console.log(`[${requestId}] Token encryption failed: ${encryptError.message}`);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to encrypt tokens',
+          details: encryptError.message,
+          step: 'token_encryption'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      let encryptedRefreshToken = null;
+      if (tokens.refresh_token) {
+        const { data: encRefreshToken, error: encRefreshError } = await serviceSupabase
+          .rpc('encrypt_token', { token: tokens.refresh_token });
+        
+        if (encRefreshError) {
+          console.log(`[${requestId}] Refresh token encryption failed: ${encRefreshError.message}`);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to encrypt refresh token',
+            details: encRefreshError.message,
+            step: 'refresh_token_encryption'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        encryptedRefreshToken = encRefreshToken;
+      }
+
+      // Update the account with encrypted tokens directly using service role
+      const { error: tokenUpdateError } = await serviceSupabase
+        .from('social_media_accounts')
+        .update({
+          encrypted_access_token: encryptedTokens,
+          encrypted_refresh_token: encryptedRefreshToken,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', account.id);
+
+      if (tokenUpdateError) {
+        console.log(`[${requestId}] Token storage failed: ${tokenUpdateError.message}`);
+        console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenUpdateError, null, 2));
         return new Response(JSON.stringify({ 
           error: 'Failed to store tokens',
-          details: tokenError.message,
-          code: tokenError.code,
+          details: tokenUpdateError.message,
+          code: tokenUpdateError.code,
           step: 'token_storage'
         }), {
           status: 400,
@@ -242,7 +293,7 @@ serve(async (req) => {
         });
       }
 
-      console.log(`[${requestId}] Step 5 completed: Tokens stored successfully`);
+      console.log(`[${requestId}] Step 5 completed: Tokens stored successfully via direct update`);
       
       // Step 6: Trigger initial stats sync
       console.log(`[${requestId}] Step 6: Triggering initial stats sync`);
