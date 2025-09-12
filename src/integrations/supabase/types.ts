@@ -490,6 +490,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_table_security_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       decrypt_token: {
         Args: { encrypted_token: string }
         Returns: string
