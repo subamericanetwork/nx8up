@@ -117,6 +117,19 @@ export default function SocialMediaStats() {
       );
 
       setAccounts(accountsWithStats || []);
+      
+      // Auto-sync stats for accounts that have no stats yet
+      const accountsWithoutStats = accountsWithStats?.filter(account => 
+        !account.social_media_stats || account.social_media_stats.length === 0
+      );
+      
+      if (accountsWithoutStats && accountsWithoutStats.length > 0) {
+        console.log('Found accounts without stats, triggering auto-sync:', accountsWithoutStats.map(a => a.platform));
+        // Trigger sync for accounts without stats (don't await to avoid blocking UI)
+        accountsWithoutStats.forEach(account => {
+          handleSyncStats(account.id, account.platform);
+        });
+      }
     } catch (error) {
       console.error('Error loading social accounts:', error);
       toast({

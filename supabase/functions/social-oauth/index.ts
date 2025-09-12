@@ -226,6 +226,23 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 5 completed: Tokens stored successfully`);
       
+      // Step 6: Trigger initial stats sync
+      console.log(`[${requestId}] Step 6: Triggering initial stats sync`);
+      
+      try {
+        const { error: syncError } = await supabase.functions.invoke('sync-social-stats', {
+          body: { accountId: account.id }
+        });
+        
+        if (syncError) {
+          console.log(`[${requestId}] Stats sync failed (non-critical):`, syncError.message);
+        } else {
+          console.log(`[${requestId}] Step 6 completed: Initial stats sync triggered`);
+        }
+      } catch (syncErr) {
+        console.log(`[${requestId}] Stats sync error (non-critical):`, syncErr);
+      }
+      
       // Return success with account information
       return new Response(JSON.stringify({ 
         success: true,
