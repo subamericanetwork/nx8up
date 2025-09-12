@@ -1,75 +1,83 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// SUPER SIMPLE VERSION FOR DEBUGGING - LOGS EVERYTHING
 serve(async (req) => {
-  console.log('🚀 DIAGNOSTIC MODE - Method:', req.method, 'URL:', req.url);
-  console.log('🚀 Headers:', Object.fromEntries(req.headers.entries()));
+  // Log immediately at start
+  console.log('=== FUNCTION START ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Timestamp:', new Date().toISOString());
   
-  // Handle CORS preflight requests
+  // Handle OPTIONS
   if (req.method === 'OPTIONS') {
-    console.log('✅ CORS preflight handled');
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling CORS OPTIONS');
+    return new Response('OK', { 
+      status: 200, 
+      headers: corsHeaders 
+    });
   }
 
+  // Log everything about the request
+  console.log('=== REQUEST DETAILS ===');
+  
   try {
-    console.log('🔧 Environment variables check:');
-    console.log('  - SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
-    console.log('  - SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-    console.log('  - GOOGLE_CLIENT_ID exists:', !!Deno.env.get('GOOGLE_CLIENT_ID'));
-    console.log('  - GOOGLE_CLIENT_SECRET exists:', !!Deno.env.get('GOOGLE_CLIENT_SECRET'));
-
-    console.log('📨 Reading request body...');
-    let requestBody;
+    // Read body
+    const body = await req.text();
+    console.log('Raw body:', body);
+    
+    let parsed;
     try {
-      const bodyText = await req.text();
-      console.log('📋 Raw body text:', bodyText);
-      requestBody = JSON.parse(bodyText);
-      console.log('📋 Parsed body:', JSON.stringify(requestBody, null, 2));
-    } catch (parseError) {
-      console.error('❌ Body parsing error:', parseError.message);
-      return new Response(JSON.stringify({ 
-        error: 'Invalid JSON in request body',
-        details: parseError.message 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      parsed = JSON.parse(body || '{}');
+      console.log('Parsed body:', JSON.stringify(parsed, null, 2));
+    } catch (e) {
+      console.log('Body parse error:', e.message);
+      parsed = {};
     }
     
-    const { action, platform, redirect_url, code } = requestBody;
-    console.log('📋 Extracted fields:', { 
-      action, 
-      platform, 
-      has_redirect_url: !!redirect_url, 
-      has_code: !!code,
-      code_length: code ? code.length : 0
-    });
-
-    // DIAGNOSTIC: Just return success for now to test logging
-    return new Response(JSON.stringify({ 
-      diagnostic: true,
-      received: { action, platform, has_code: !!code },
-      message: 'Diagnostic mode - check logs for details'
+    // Log all headers
+    console.log('=== HEADERS ===');
+    for (const [key, value] of req.headers.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+    
+    // Log environment
+    console.log('=== ENVIRONMENT ===');
+    console.log('SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
+    console.log('SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    console.log('GOOGLE_CLIENT_ID exists:', !!Deno.env.get('GOOGLE_CLIENT_ID'));
+    console.log('GOOGLE_CLIENT_SECRET exists:', !!Deno.env.get('GOOGLE_CLIENT_SECRET'));
+    
+    console.log('=== RETURNING SUCCESS ===');
+    
+    // Return a successful response with diagnostic info
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Function is working - check logs for details',
+      timestamp: new Date().toISOString(),
+      received: parsed,
+      method: req.method
     }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
-
-  } catch (error) {
-    console.error('💥 DIAGNOSTIC ERROR - Type:', typeof error);
-    console.error('💥 DIAGNOSTIC ERROR - Message:', error.message);
-    console.error('💥 DIAGNOSTIC ERROR - Stack:', error.stack);
     
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Unknown error occurred',
-      details: 'Diagnostic mode - check function logs',
+  } catch (error) {
+    console.log('=== ERROR OCCURRED ===');
+    console.log('Error type:', typeof error);
+    console.log('Error message:', error?.message || 'No message');
+    console.log('Error stack:', error?.stack || 'No stack');
+    
+    return new Response(JSON.stringify({
+      error: true,
+      message: error?.message || 'Unknown error',
       timestamp: new Date().toISOString()
     }), {
-      status: 400,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
