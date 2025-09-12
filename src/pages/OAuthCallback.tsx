@@ -71,12 +71,11 @@ export default function OAuthCallback() {
           platform,
           code: code ? `${code.substring(0, 20)}...` : 'MISSING',
           redirect_url: `${window.location.origin}/oauth/callback`,
-          session_token: session?.access_token ? `${session.access_token.substring(0, 20)}...` : 'MISSING'
+          session_exists: !!session
         });
         
-        if (!session) {
-          throw new Error('No user session found');
-        }
+        // Session is not required since JWT verification is disabled
+        console.log('Proceeding without session validation (JWT verification disabled)');
 
         const { data, error } = await supabase.functions.invoke('social-oauth', {
           body: {

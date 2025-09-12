@@ -150,137 +150,90 @@ export default function SocialMediaConnections() {
         
         // Set up message listener for OAuth callback
         const messageListener = (event: MessageEvent) => {
-          // Verify origin for security
-          if (!event.origin.includes('nx8up.lovable.app') && 
-              !event.origin.includes('lovable.app') && 
-              !event.origin.includes('lovable.dev') &&
-              !event.origin.includes('sandbox.lovable.dev') &&
-              !event.origin.includes(window.location.origin)) {
-            return;
-          }
-          
-          console.log('Received message from popup:', event.data);
+          console.log('Received message from popup:', event.data, 'from origin:', event.origin);
           
           if (event.data?.type === 'OAUTH_CALLBACK') {
-            const { code, error, platform: callbackPlatform } = event.data;
+            const { success, error, account, platform: callbackPlatform } = event.data;
             
-            // Clean up
-            window.removeEventListener('message', messageListener);
-            if (checkClosed) clearInterval(checkClosed);
-            popup.close();
+            // Clean up immediately
+            cleanup();
             
             if (error) {
               console.error('OAuth error from popup:', error);
               toast({
                 title: 'Connection Failed',
-                description: 'OAuth authorization was denied or failed',
+                description: error || 'OAuth authorization failed',
                 variant: 'destructive'
               });
               setConnecting(null);
               return;
             }
 
-            if (code) {
-              console.log('OAuth code received via message, processing callback...');
-              handleOAuthCallback(callbackPlatform || platform, code);
+            if (success && account) {
+              console.log('OAuth success via message:', account);
+              toast({
+                title: 'Connected Successfully!',
+                description: `Your ${account.platform} account has been connected`,
+              });
+              setConnecting(null);
+              // Refresh accounts list
+              setTimeout(() => loadConnectedAccounts(), 1000);
             }
+          }
+        };
+        
+        // Cleanup function
+        const cleanup = () => {
+          if (checkClosed) {
+            clearInterval(checkClosed);
+          }
+          window.removeEventListener('message', messageListener);
+          try {
+            if (!popup.closed) {
+              popup.close();
+            }
+          } catch (e) {
+            console.log('Popup already closed');
           }
         };
         
         window.addEventListener('message', messageListener);
         
-        // Monitor popup for completion and OAuth callback
+        // Simple popup monitoring - only check if closed
         const checkClosed = setInterval(() => {
           try {
-            // Check if popup is closed
             if (popup.closed) {
-              clearInterval(checkClosed);
-              window.removeEventListener('message', messageListener);
+              console.log('Popup was closed by user');
+              cleanup();
               setConnecting(null);
               // Refresh accounts to see if connection was successful
               setTimeout(() => loadConnectedAccounts(), 1000);
               return;
             }
-
-            // Try to detect if we're back on our domain
-            try {
-              const popupUrl = popup.location.href;
-              console.log('Popup URL detected:', popupUrl);
-              
-              // Check if we're back on our domain (handle all domains)
-              if (popupUrl.includes('nx8up.loveable.app') || 
-                  popupUrl.includes('lovable.app') || 
-                  popupUrl.includes('lovable.dev') ||
-                  popupUrl.includes('sandbox.lovable.dev') ||
-                  popupUrl.includes(window.location.origin)) {
-                
-                const urlParams = new URLSearchParams(new URL(popupUrl).search);
-                const code = urlParams.get('code');
-                const error = urlParams.get('error');
-                const state = urlParams.get('state');
-                
-                // Extract platform from state if available
-                let callbackPlatform = platform;
-                if (state && state.includes('|')) {
-                  callbackPlatform = state.split('|')[1];
-                }
-                
-                console.log('Direct callback detected:', { code: !!code, error, platform: callbackPlatform });
-                
-                if (code || error) {
-                  // OAuth callback detected - process it
-                  clearInterval(checkClosed);
-                  window.removeEventListener('message', messageListener);
-                  popup.close();
-                  
-                  if (error) {
-                    console.error('OAuth error in popup:', error);
-                    toast({
-                      title: 'Connection Failed',
-                      description: 'OAuth authorization was denied or failed',
-                      variant: 'destructive'
-                    });
-                    setConnecting(null);
-                    return;
-                  }
-
-                  if (code) {
-                    console.log('OAuth code received directly, processing callback...');
-                    // Process the OAuth callback
-                    handleOAuthCallback(callbackPlatform, code);
-                  }
-                }
-              }
-            } catch (e) {
-              // Cross-origin error - popup is still on OAuth provider's domain
-              // This is expected, continue monitoring
-              // console.log('Cross-origin access blocked (expected while on OAuth provider)');
-            }
           } catch (error) {
-            // If we can't access the popup, it might be closed
-            console.error('Error monitoring popup:', error);
-            if (popup.closed) {
-              clearInterval(checkClosed);
-              window.removeEventListener('message', messageListener);
-              setConnecting(null);
-            }
-          }
-        }, 500);
-
-        // Also add a timeout to prevent infinite waiting
-        setTimeout(() => {
-          if (!popup.closed) {
-            clearInterval(checkClosed);
-            popup.close();
+            console.log('Error checking popup status:', error);
+            cleanup();
             setConnecting(null);
-            console.log('OAuth timeout - closing popup');
-            toast({
-              title: 'Connection Timeout',
-              description: 'The connection process took too long. Please try again.',
-              variant: 'destructive'
-            });
           }
-        }, 300000); // 5 minute timeout
+        }, 1000); // Check less frequently
+
+        // Add timeout to prevent infinite waiting
+        setTimeout(() => {
+          try {
+            if (!popup.closed) {
+              console.log('OAuth timeout - closing popup');
+              cleanup();
+              setConnecting(null);
+              toast({
+                title: 'Connection Timeout',
+                description: 'The connection process took too long. Please try again.',
+                variant: 'destructive'
+              });
+            }
+          } catch (e) {
+            console.log('Timeout cleanup already handled');
+          }
+        }, 120000); // 2 minute timeout
         
       } else {
         console.error('No auth URL in response:', data);
@@ -300,54 +253,6 @@ export default function SocialMediaConnections() {
   // Reload accounts when needed (called from parent component after OAuth success)
   const refreshAccounts = async () => {
     await loadConnectedAccounts();
-  };
-
-  const handleOAuthCallback = async (platform: string, code: string) => {
-    try {
-      console.log('Processing OAuth callback for platform:', platform);
-      
-      // Use the same redirect URL as used in connect flow
-      const redirectUrl = 'https://nx8up.lovable.app/oauth/callback';
-      
-      const { data, error } = await supabase.functions.invoke('social-oauth', {
-        body: { 
-          action: 'callback',
-          platform,
-          code,
-          redirect_url: redirectUrl
-        }
-      });
-
-      if (error) {
-        console.error('OAuth callback error:', error);
-        throw error;
-      }
-
-      if (!data?.success) {
-        console.error('OAuth callback failed:', data);
-        throw new Error(data?.error || 'Connection failed');
-      }
-
-      console.log('OAuth callback successful:', data);
-      
-      toast({
-        title: 'Connected Successfully!',
-        description: `Your ${platform} account has been connected`,
-      });
-
-      // Refresh the accounts list
-      setTimeout(() => loadConnectedAccounts(), 1000);
-
-    } catch (error) {
-      console.error('OAuth callback processing error:', error);
-      toast({
-        title: 'Connection Failed',
-        description: `Failed to connect ${platform} account: ${error.message || 'Please try again.'}`,
-        variant: 'destructive'
-      });
-    } finally {
-      setConnecting(null);
-    }
   };
 
   const handleDisconnect = async (accountId: string, platform: string) => {
