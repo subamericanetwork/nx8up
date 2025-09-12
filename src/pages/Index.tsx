@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useNavigate } from "react-router-dom"
+import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,11 +12,25 @@ import heroImage from "@/assets/nx8up-hero.jpg"
 const Index = () => {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeView, setActiveView] = useState<'landing' | 'creator' | 'sponsor'>('landing')
 
-  const handleAuthAction = () => {
+  const handleAuthAction = async () => {
     if (user) {
-      signOut();
+      try {
+        await signOut();
+        toast({
+          title: 'Signed out successfully',
+          description: 'You have been logged out of your account.'
+        });
+      } catch (error) {
+        console.error('Sign out error:', error);
+        toast({
+          title: 'Sign out failed',
+          description: 'There was an error signing you out. Please try again.',
+          variant: 'destructive'
+        });
+      }
     } else {
       navigate('/auth');
     }
