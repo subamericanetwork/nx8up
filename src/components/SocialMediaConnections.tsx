@@ -153,7 +153,7 @@ export default function SocialMediaConnections() {
         // Set up message listener for OAuth callback
         const messageListener = (event: MessageEvent) => {
           // Verify origin for security
-          if (!event.origin.includes('nx8up.loveable.app') && 
+          if (!event.origin.includes('nx8up.lovable.app') && 
               !event.origin.includes('lovable.app') && 
               !event.origin.includes('lovable.dev') &&
               !event.origin.includes('sandbox.lovable.dev') &&
