@@ -438,7 +438,7 @@ serve(async (req) => {
             account_id: account.id,
             new_access_token: tokens.access_token,
             new_refresh_token: tokens.refresh_token || null,
-            new_expires_at: expiresAt
+            new_expires_at: expiresAt?.toISOString() || null
           });
 
         if (tokenUpdateError) {
