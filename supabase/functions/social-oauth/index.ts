@@ -103,7 +103,7 @@ serve(async (req) => {
       });
     }
 
-    // ============= TEST ACTION =============  
+    // ============= TEST ACTION =============
     if (body.test) {
       console.log(`[${requestId}] Test endpoint called`);
       const envCheck = {
@@ -112,6 +112,12 @@ serve(async (req) => {
         hasYouTubeApiKey: !!Deno.env.get('YOUTUBE_API_KEY'),
         hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
         hasSupabaseServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+        // Show first 12 characters of Client ID for verification (safe to expose)
+        clientIdPrefix: Deno.env.get('GOOGLE_CLIENT_ID')?.substring(0, 12) + '...',
+        // Show expected redirect URI
+        expectedRedirectUri: 'https://nx8up.lovable.app/oauth/callback',
+        // Show expected JavaScript origins
+        expectedJsOrigins: ['https://nx8up.lovable.app', 'https://accounts.google.com'],
         functionDeployed: true,
         timestamp: new Date().toISOString(),
         requestId
