@@ -236,12 +236,22 @@ serve(async (req) => {
         .from('social_media_accounts')
         .upsert(accountData, { onConflict: 'creator_id,platform' })
         .select()
-        .single();
+        .maybeSingle();
 
       if (dbError) {
         console.log('Database error:', dbError.message);
         return new Response(JSON.stringify({ 
           error: `Database error: ${dbError.message}` 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!savedAccount) {
+        console.log('ERROR: No account data returned from upsert');
+        return new Response(JSON.stringify({ 
+          error: 'Failed to save account data' 
         }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
