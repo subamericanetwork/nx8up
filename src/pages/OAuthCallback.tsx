@@ -190,22 +190,27 @@ export default function OAuthCallback() {
           throw error;
         }
 
-        if (data?.error) {
-          console.error('❌ OAUTH CALLBACK: Function returned error:', data.error);
-          console.error('❌ OAUTH CALLBACK: Error details:', data.details);
+        if (data?.error || data?.googleError) {
+          const mainError = data.error || 'OAuth failed';
+          const googleError = data.googleError;
+          
+          console.error('❌ OAUTH CALLBACK: Function returned error:', mainError);
+          console.error('❌ OAUTH CALLBACK: Google error details:', googleError);
           console.error('❌ OAUTH CALLBACK: Debug info:', data.debug);
           
-          // Create detailed error message
-          let errorMessage = data.error;
-          if (data.details?.error_description) {
-            errorMessage += `: ${data.details.error_description}`;
-          } else if (data.details?.raw_error) {
-            errorMessage += `: ${data.details.raw_error}`;
+          // Create detailed error message with Google's specific error
+          let errorMessage = mainError;
+          if (googleError?.error_description) {
+            errorMessage += `: ${googleError.error_description}`;
+          } else if (googleError?.error) {
+            errorMessage += `: ${googleError.error}`;
+          } else if (googleError?.raw_error) {
+            errorMessage += `: ${googleError.raw_error}`;
           }
           
-          console.error('❌ OAUTH CALLBACK: Full error context:', {
-            mainError: data.error,
-            details: data.details,
+          console.error('❌ OAUTH CALLBACK: Complete error context:', {
+            mainError,
+            googleError,
             debug: data.debug,
             status: data.status,
             step: data.step,

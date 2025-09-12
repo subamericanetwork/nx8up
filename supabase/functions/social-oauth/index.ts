@@ -272,15 +272,28 @@ serve(async (req) => {
         let errorDetails;
         try {
           errorDetails = JSON.parse(errorText);
-          console.error(`[${requestId}] Parsed error details:`, errorDetails);
+          console.error(`[${requestId}] Parsed Google error:`, errorDetails);
         } catch (e) {
           console.error(`[${requestId}] Could not parse error response as JSON`);
           errorDetails = { raw_error: errorText };
         }
         
+        // Log the exact request we sent to Google (without exposing secrets)
+        console.error(`[${requestId}] Failed token request details:`, {
+          url: 'https://oauth2.googleapis.com/token',
+          method: 'POST',
+          hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+          hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
+          clientIdLength: Deno.env.get('GOOGLE_CLIENT_ID')?.length || 0,
+          secretLength: Deno.env.get('GOOGLE_CLIENT_SECRET')?.length || 0,
+          codeLength: code?.length || 0,
+          redirectUri: callbackRedirectUri,
+          requestBodyKeys: Array.from(tokenRequestBody.keys())
+        });
+        
         return new Response(JSON.stringify({ 
-          error: 'Token exchange failed',
-          details: errorDetails,
+          error: 'Google OAuth token exchange failed',
+          googleError: errorDetails,
           status: tokenResponse.status,
           step: 'token_exchange',
           requestId: requestId,
