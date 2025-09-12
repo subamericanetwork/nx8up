@@ -155,26 +155,35 @@ const getUserInfo = async (platform: string, accessToken: string): Promise<any> 
 };
 
 serve(async (req) => {
+  console.log('=== SOCIAL OAUTH FUNCTION CALLED ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('=== SOCIAL OAUTH FUNCTION CALLED ===');
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
     console.log('Headers:', req.headers);
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    console.log('Supabase client created successfully');
 
     const requestBody = await req.json();
     const { action, platform, redirect_url, code, state } = requestBody;
 
     console.log('OAuth request:', { action, platform, redirect_url, code: !!code, state });
+
+    // Validate required parameters
+    if (!action || !platform) {
+      console.error('Missing required parameters:', { action, platform });
+      throw new Error('Missing required parameters: action and platform');
+    }
 
     // Check if required environment variables exist
     const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -314,6 +323,12 @@ serve(async (req) => {
         })
         .select()
         .single();
+
+      console.log('Database upsert result:', { 
+        success: !!accountData, 
+        error: accountError,
+        accountId: accountData?.id 
+      });
 
       if (accountError) {
         console.error('Database error creating social account:', accountError);
