@@ -108,16 +108,22 @@ export default function OAuthCallback() {
         // Send success message to parent window
         if (window.opener) {
           try {
+            console.log('Sending success message to parent window...');
             window.opener.postMessage({
               type: 'OAUTH_CALLBACK',
               success: true,
               account: data.account,
               platform
-            }, '*'); // Use '*' for cross-origin messaging
+            }, window.location.origin); // Use specific origin instead of '*'
             
             // Close the popup after a brief delay
             setTimeout(() => {
-              window.close();
+              try {
+                window.close();
+              } catch (closeError) {
+                console.log('Could not close window, redirecting instead');
+                window.location.href = '/creator-dashboard';
+              }
             }, 1000);
           } catch (postMessageError) {
             console.error('Failed to send message to parent:', postMessageError);
@@ -126,6 +132,7 @@ export default function OAuthCallback() {
           }
         } else {
           // Fallback: redirect to dashboard
+          console.log('No window opener, redirecting to dashboard');
           window.location.href = '/creator-dashboard';
         }
         
@@ -142,16 +149,35 @@ export default function OAuthCallback() {
         // Send error message to parent window
         if (window.opener) {
           try {
+            console.log('Sending error message to parent window...');
             window.opener.postMessage({
               type: 'OAUTH_CALLBACK',
               error: err.message || 'Failed to complete OAuth',
               platform
-            }, '*'); // Use '*' for cross-origin messaging
-            window.close();
+            }, window.location.origin); // Use specific origin instead of '*'
+            
+            setTimeout(() => {
+              try {
+                window.close();
+              } catch (closeError) {
+                console.log('Could not close window, redirecting instead');
+                window.location.href = '/creator-dashboard';
+              }
+            }, 1000);
           } catch (postMessageError) {
             console.error('Failed to send error to parent:', postMessageError);
-            window.close();
+            setTimeout(() => {
+              try {
+                window.close();
+              } catch (closeError) {
+                console.log('Could not close window, redirecting instead');
+                window.location.href = '/creator-dashboard';
+              }
+            }, 1000);
           }
+        } else {
+          console.log('No window opener, redirecting to dashboard');
+          window.location.href = '/creator-dashboard';
         }
       }
     };

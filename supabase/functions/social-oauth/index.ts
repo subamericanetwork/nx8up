@@ -27,9 +27,12 @@ serve(async (req) => {
     if (action === 'connect') {
       console.log(`[${requestId}] Processing connect request for ${platform}`);
       
-      const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
+      // Use the same redirect URL logic as the callback
+      const authRedirectUri = redirect_url || 'https://nx8up.lovable.app/oauth/callback';
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       const state = `${crypto.randomUUID()}|${platform}`;
+      
+      console.log(`[${requestId}] Using redirect URI: ${authRedirectUri}`);
       
       authUrl.searchParams.set('client_id', Deno.env.get('GOOGLE_CLIENT_ID') || '');
       authUrl.searchParams.set('redirect_uri', authRedirectUri);
