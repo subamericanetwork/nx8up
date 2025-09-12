@@ -110,6 +110,17 @@ export default function SocialMediaConnections() {
 
     setConnecting(platform);
     
+    // First, test if the edge function is accessible at all
+    console.log('🧪 Testing edge function accessibility...');
+    try {
+      const testResponse = await supabase.functions.invoke('social-oauth', {
+        body: { test: true }
+      });
+      console.log('🧪 Edge function test response:', testResponse);
+    } catch (testError) {
+      console.error('🧪 Edge function test failed:', testError);
+    }
+    
     try {
       console.log('Starting OAuth flow for platform:', platform);
       console.log('Current window.location.href:', window.location.href);
@@ -119,7 +130,17 @@ export default function SocialMediaConnections() {
       const redirectUrl = 'https://nx8up.lovable.app/oauth/callback';
         
       console.log('Redirect URL will be:', redirectUrl);
+      
+      // Clear any existing OAuth results before starting
+      localStorage.removeItem('oauth_result');
+      console.log('Cleared existing OAuth results from localStorage');
         
+      console.log('🔄 About to call social-oauth edge function with payload:', {
+        action: 'connect',
+        platform,
+        redirect_url: redirectUrl
+      });
+
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
           action: 'connect',
@@ -128,15 +149,33 @@ export default function SocialMediaConnections() {
         }
       });
 
-      console.log('OAuth initiation response:', { data, error, platform });
+      console.log('📥 Edge function raw response:', { 
+        data, 
+        error, 
+        platform,
+        hasData: !!data,
+        hasError: !!error,
+        dataType: typeof data,
+        errorType: typeof error,
+        dataKeys: data ? Object.keys(data) : 'N/A',
+        errorProps: error ? Object.keys(error) : 'N/A'
+      });
 
       if (error) {
-        console.error('Supabase function error:', error);
+        console.error('❌ Supabase function error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          status: error.status,
+          statusText: error.statusText,
+          stack: error.stack
+        });
         throw error;
       }
 
       if (data?.error) {
-        console.error('Function returned error:', data.error);
+        console.error('❌ Function returned error:', data.error);
         throw new Error(data.error);
       }
 
