@@ -5,7 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-  'Cross-Origin-Embedder-Policy': 'unsafe-none',
 }
 
 serve(async (req) => {
@@ -25,6 +24,7 @@ serve(async (req) => {
     console.log('GOOGLE_CLIENT_ID exists:', !!Deno.env.get('GOOGLE_CLIENT_ID'));
     console.log('GOOGLE_CLIENT_SECRET exists:', !!Deno.env.get('GOOGLE_CLIENT_SECRET'));
     console.log('SUPABASE_SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    console.log('SUPABASE_PUBLISHABLE_KEY exists:', !!Deno.env.get('SUPABASE_PUBLISHABLE_KEY'));
 
     if (!Deno.env.get('GOOGLE_CLIENT_ID')) {
       return new Response(JSON.stringify({ 
@@ -46,8 +46,30 @@ serve(async (req) => {
     const bodyText = await req.text();
     console.log('Raw body text:', bodyText);
     
-    const body = JSON.parse(bodyText);
-    console.log('Parsed request body:', body);
+    if (!bodyText) {
+      console.log('ERROR: Empty request body');
+      return new Response(JSON.stringify({ 
+        error: 'Empty request body' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    let body;
+    try {
+      body = JSON.parse(bodyText);
+      console.log('Parsed request body:', JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.log('ERROR: Failed to parse JSON:', parseError.message);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid JSON in request body',
+        details: parseError.message
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     console.log('=== EXTRACTED PARAMETERS ===');
     const { action, platform, code, redirect_url } = body;
@@ -56,22 +78,12 @@ serve(async (req) => {
     console.log('code exists:', !!code);
     console.log('code length:', code?.length || 0);
 
-    console.log('=== DOMAIN DETECTION ===');
-    console.log('Requested redirect URL:', redirect_url);
-    const fallbackOrigin = 'https://nx8up.lovable.app';
-    console.log('Fallback origin:', fallbackOrigin);
-    const finalRedirectUrl = redirect_url || fallbackOrigin;
-    console.log('Final redirect URL:', finalRedirectUrl);
-
-    console.log('Using Google Client ID:', Deno.env.get('GOOGLE_CLIENT_ID')?.substring(0, 15) + '...');
-
     // ============= CONNECT ACTION =============
     if (action === 'connect') {
       console.log('=== PROCESSING CONNECT REQUEST ===');
       
-      // Use consistent redirect URI - must match Google Console configuration exactly
       const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
-      console.log('Using standardized callback URL:', authRedirectUri);
+      console.log('Using callback URL:', authRedirectUri);
 
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       const state = `${crypto.randomUUID()}|${platform}`;
@@ -89,7 +101,7 @@ serve(async (req) => {
         state: state
       };
       
-      console.log('Returning connect response:', connectResponse);
+      console.log('Returning connect response:', JSON.stringify(connectResponse, null, 2));
       return new Response(JSON.stringify(connectResponse), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -98,12 +110,19 @@ serve(async (req) => {
     // ============= CALLBACK ACTION =============
     if (action === 'callback') {
       console.log('=== PROCESSING CALLBACK ===');
-      console.log('Step 0: Callback action started successfully');
-      console.log('Step 1: Exchanging code for token...');
       
-      // Use the SAME redirect URI as connect - must match Google Console configuration
+      if (!code) {
+        console.log('ERROR: No authorization code provided');
+        return new Response(JSON.stringify({ 
+          error: 'No authorization code provided' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      console.log('Step 1: Exchanging code for token...');
       const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
-      console.log('Using standardized callback URL for token exchange:', authRedirectUri);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -112,28 +131,19 @@ serve(async (req) => {
           grant_type: 'authorization_code',
           client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-          redirect_uri: authRedirectUri,  // MUST match what was sent to Google
+          redirect_uri: authRedirectUri,
           code: code
         })
       });
 
       console.log('Token exchange response status:', tokenResponse.status);
-      console.log('Token exchange headers:', Object.fromEntries(tokenResponse.headers.entries()));
       
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
-        console.log('Token exchange failed with details:', {
-          status: tokenResponse.status,
-          statusText: tokenResponse.statusText,
-          error: errorText,
-          redirect_uri: authRedirectUri,
-          has_client_id: !!Deno.env.get('GOOGLE_CLIENT_ID'),
-          has_client_secret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
-          code_length: code?.length
-        });
+        console.log('Token exchange failed:', errorText);
         return new Response(JSON.stringify({ 
-          error: `Token exchange failed: ${tokenResponse.status} - ${errorText}. Make sure your Google OAuth app is configured with redirect URI: https://nx8up.lovable.app/oauth/callback`,
-          details: 'Check Google Cloud Console OAuth configuration'
+          error: `Token exchange failed: ${tokenResponse.status}`,
+          details: errorText
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -141,7 +151,7 @@ serve(async (req) => {
       }
 
       const tokenData = await tokenResponse.json();
-      console.log('Token exchange successful, got access token');
+      console.log('Token exchange successful');
 
       console.log('Step 2: Getting user info...');
       const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -161,33 +171,14 @@ serve(async (req) => {
       const userInfo = await userResponse.json();
       console.log('Got user info for:', userInfo.name);
 
-      console.log('Step 3: Getting YouTube channel...');
-      const channelResponse = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true`, {
-        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
-      });
-
-      let channelData = null;
-      if (channelResponse.ok) {
-        const channelResult = await channelResponse.json();
-        if (channelResult.items && channelResult.items.length > 0) {
-          channelData = channelResult.items[0];
-          console.log('Got YouTube channel:', channelData.snippet.title);
-        } else {
-          console.log('No YouTube channel found for user');
-        }
-      } else {
-        console.log('YouTube API call failed:', channelResponse.status);
-      }
-
-      console.log('Step 4: Getting authenticated user...');
+      console.log('Step 3: Getting authenticated user...');
       const authHeader = req.headers.get('Authorization');
       console.log('Auth header present:', !!authHeader);
       
       if (!authHeader) {
-        console.log('ERROR: No authorization header in callback request');
+        console.log('ERROR: No authorization header');
         return new Response(JSON.stringify({ 
-          error: 'Missing authorization header',
-          details: 'User session not found during OAuth callback'
+          error: 'Missing authorization header' 
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -198,21 +189,11 @@ serve(async (req) => {
         authHeader.replace('Bearer ', '')
       );
 
-      console.log('Supabase auth result:', { 
-        hasUser: !!user, 
-        userId: user?.id,
-        authError: authError?.message 
-      });
-
       if (authError || !user) {
-        console.log('Authentication failed with details:', {
-          authError: authError?.message,
-          hasUser: !!user,
-          headerLength: authHeader?.length
-        });
+        console.log('Authentication failed:', authError?.message);
         return new Response(JSON.stringify({ 
-          error: 'User authentication failed',
-          details: authError?.message || 'No user found'
+          error: 'Authentication failed',
+          details: authError?.message
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -221,23 +202,7 @@ serve(async (req) => {
 
       console.log('Authenticated user:', user.id);
 
-      console.log('Step 5: Saving to database...');
-      
-      const accountData = {
-        creator_id: user.id,
-        platform: 'youtube',
-        platform_user_id: channelData?.id || userInfo.id,
-        username: channelData?.snippet?.title || userInfo.name || 'User',
-        display_name: channelData?.snippet?.title || userInfo.name || 'User',
-        profile_image_url: channelData?.snippet?.thumbnails?.default?.url || userInfo.picture,
-        is_active: true,
-        connected_at: new Date().toISOString()
-      };
-      
-      console.log('Account data to save:', JSON.stringify(accountData, null, 2));
-
-      console.log('Creating service role client for database operations...');
-      // Use service role client for database operations (required by RLS policies)
+      console.log('Step 4: Creating service role client...');
       const serviceRoleSupabase = createClient(
         Deno.env.get('SUPABASE_URL') || '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
@@ -248,23 +213,26 @@ serve(async (req) => {
           }
         }
       );
-      console.log('Service role client created successfully');
 
-      console.log('Attempting to upsert social media account...');
+      console.log('Step 5: Saving account to database...');
+      const accountData = {
+        creator_id: user.id,
+        platform: 'youtube',
+        platform_user_id: userInfo.id,
+        username: userInfo.name || 'User',
+        display_name: userInfo.name || 'User',
+        profile_image_url: userInfo.picture,
+        is_active: true,
+        connected_at: new Date().toISOString()
+      };
+
+      console.log('Account data:', JSON.stringify(accountData, null, 2));
+
       const { data: savedAccount, error: dbError } = await serviceRoleSupabase
         .from('social_media_accounts')
         .upsert(accountData, { onConflict: 'creator_id,platform' })
         .select()
         .maybeSingle();
-      
-      console.log('Upsert result:', { 
-        hasData: !!savedAccount, 
-        dataId: savedAccount?.id,
-        hasError: !!dbError,
-        errorMessage: dbError?.message,
-        errorCode: dbError?.code,
-        errorDetails: dbError?.details
-      });
 
       if (dbError) {
         console.log('Database error:', dbError.message);
@@ -277,7 +245,7 @@ serve(async (req) => {
       }
 
       if (!savedAccount) {
-        console.log('ERROR: No account data returned from upsert');
+        console.log('ERROR: No account data returned');
         return new Response(JSON.stringify({ 
           error: 'Failed to save account data' 
         }), {
@@ -288,18 +256,7 @@ serve(async (req) => {
 
       console.log('Account saved successfully:', savedAccount.id);
 
-      console.log('Step 6: Saving tokens securely...');
-      console.log('Environment check - SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
-      console.log('Environment check - SUPABASE_SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-      
-      console.log('Calling update_encrypted_tokens with account_id:', savedAccount.id);
-      console.log('Token data available:', {
-        hasAccessToken: !!tokenData.access_token,
-        hasRefreshToken: !!tokenData.refresh_token,
-        accessTokenLength: tokenData.access_token?.length,
-        refreshTokenLength: tokenData.refresh_token?.length
-      });
-      
+      console.log('Step 6: Saving tokens...');
       const { error: tokenError } = await serviceRoleSupabase.rpc('update_encrypted_tokens', {
         account_id: savedAccount.id,
         new_access_token: tokenData.access_token,
@@ -307,26 +264,17 @@ serve(async (req) => {
       });
 
       if (tokenError) {
-        console.log('Token save error details:', {
-          message: tokenError.message,
-          code: tokenError.code,
-          details: tokenError.details,
-          hint: tokenError.hint
-        });
-        
-        // Return error if token saving fails
+        console.log('Token save error:', tokenError.message);
         return new Response(JSON.stringify({ 
           error: `Failed to save tokens: ${tokenError.message}` 
         }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
-      } else {
-        console.log('Tokens saved securely');
       }
 
-      console.log('=== SUCCESS - RETURNING ACCOUNT DATA ===');
-      const successResponse = { 
+      console.log('=== SUCCESS ===');
+      return new Response(JSON.stringify({ 
         success: true,
         message: 'YouTube account connected successfully!',
         account: {
@@ -335,16 +283,15 @@ serve(async (req) => {
           username: savedAccount.username,
           display_name: savedAccount.display_name
         }
-      };
-      
-      return new Response(JSON.stringify(successResponse), {
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     console.log('ERROR: Invalid action:', action);
     return new Response(JSON.stringify({ 
-      error: 'Invalid action' 
+      error: 'Invalid action',
+      validActions: ['connect', 'callback']
     }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -356,12 +303,10 @@ serve(async (req) => {
     console.log('Error name:', error?.name);
     console.log('Error message:', error?.message);
     console.log('Error stack:', error?.stack);
-    console.log('Error object:', JSON.stringify(error, null, 2));
     
     return new Response(JSON.stringify({ 
       error: error?.message || 'Unknown error occurred',
-      errorType: error?.name || 'UnknownError',
-      timestamp: new Date().toISOString()
+      errorType: error?.name || 'UnknownError'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
