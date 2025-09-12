@@ -108,8 +108,8 @@ serve(async (req) => {
       console.log(`[${requestId}] Processing connect request for ${platform}`);
       console.log(`[${requestId}] Raw redirect_url from request:`, redirect_url);
       
-      // Use dynamic redirect URI to ensure it matches the current environment
-      const authRedirectUri = `${new URL(req.url).origin}/oauth/callback`;
+      // Use the correct application URL for OAuth redirect
+      const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
       console.log(`[${requestId}] Using redirect URI: ${authRedirectUri}`);
       
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -218,7 +218,7 @@ serve(async (req) => {
       });
       
       // CRITICAL: Use the same redirect URI that was used in the initial OAuth request
-      const callbackRedirectUri = `${new URL(req.url).origin}/oauth/callback`;
+      const callbackRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
       console.log(`[${requestId}] Using consistent redirect_uri: ${callbackRedirectUri}`);
       
       const tokenRequestBody = new URLSearchParams({
