@@ -114,8 +114,15 @@ export default function CreatorDashboard() {
     const platform = urlParams.get('platform');
     const code = urlParams.get('code');
     const error = urlParams.get('error');
+    const state = urlParams.get('state');
     
-    console.log('OAuth URL params:', { platform, code: !!code, error });
+    // Extract platform from state if not in URL params
+    let actualPlatform = platform;
+    if (!actualPlatform && state && state.includes('|')) {
+      actualPlatform = state.split('|')[1];
+    }
+    
+    console.log('OAuth URL params:', { platform: actualPlatform, code: !!code, error, state });
     
     if (error) {
       console.log('OAuth error detected:', error);
@@ -129,9 +136,9 @@ export default function CreatorDashboard() {
       return;
     }
     
-    if (platform && code) {
+    if (actualPlatform && code) {
       console.log('OAuth callback detected, calling handleOAuthCallback...');
-      handleOAuthCallback(platform, code);
+      handleOAuthCallback(actualPlatform, code);
     } else {
       console.log('No OAuth callback detected - missing platform or code');
     }

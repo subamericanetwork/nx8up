@@ -97,11 +97,12 @@ serve(async (req) => {
       console.log('Using Google Client ID:', clientId?.substring(0, 20) + '...');
       
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      const state = crypto.randomUUID();
       authUrl.searchParams.set('client_id', clientId!);
-      authUrl.searchParams.set('redirect_uri', `${redirectUrl}?platform=youtube`);
+      authUrl.searchParams.set('redirect_uri', redirectUrl);
       authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile');
       authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('state', crypto.randomUUID());
+      authUrl.searchParams.set('state', `${state}|${platform}`);
 
       const finalAuthUrl = authUrl.toString();
       console.log('Generated auth URL:', finalAuthUrl);
@@ -139,7 +140,7 @@ serve(async (req) => {
           grant_type: 'authorization_code',
           client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-          redirect_uri: `${redirectUrl}?platform=youtube`,
+          redirect_uri: redirectUrl,
           code: code
         })
       });

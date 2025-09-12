@@ -166,8 +166,15 @@ export default function SocialMediaConnections() {
                 const urlParams = new URLSearchParams(new URL(popupUrl).search);
                 const code = urlParams.get('code');
                 const error = urlParams.get('error');
+                const state = urlParams.get('state');
                 
-                console.log('Callback detected:', { code: !!code, error });
+                // Extract platform from state if available
+                let callbackPlatform = platform;
+                if (state && state.includes('|')) {
+                  callbackPlatform = state.split('|')[1];
+                }
+                
+                console.log('Callback detected:', { code: !!code, error, platform: callbackPlatform });
                 
                 if (code || error) {
                   // OAuth callback detected - process it
@@ -188,7 +195,7 @@ export default function SocialMediaConnections() {
                   if (code) {
                     console.log('OAuth code received, processing callback...');
                     // Process the OAuth callback
-                    handleOAuthCallback(platform, code);
+                    handleOAuthCallback(callbackPlatform, code);
                   }
                 }
               }
