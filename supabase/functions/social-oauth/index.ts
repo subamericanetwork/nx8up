@@ -133,7 +133,8 @@ serve(async (req) => {
 
       console.log('Step 1: Exchanging code for token...');
       
-      // Token exchange
+      // Token exchange - need to get the redirect_url from the original request
+      const originalRedirectUrl = requestBody.redirect_url || redirectUrl;
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -141,7 +142,7 @@ serve(async (req) => {
           grant_type: 'authorization_code',
           client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-          redirect_uri: redirectUrl,
+          redirect_uri: originalRedirectUrl,
           code: code
         })
       });
