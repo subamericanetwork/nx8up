@@ -269,8 +269,8 @@ serve(async (req) => {
 
       console.log(`[${requestId}] Step 4 completed: Account created - ${account.id}`);
 
-      // Step 5: Store encrypted tokens using service role client
-      console.log(`[${requestId}] Step 5: Storing encrypted tokens directly`);
+      // Step 5: Store encrypted tokens using secure token function
+      console.log(`[${requestId}] Step 5: Storing encrypted tokens securely`);
       
       // Create service role client for secure token operations
       const serviceSupabase = createClient(
@@ -284,95 +284,37 @@ serve(async (req) => {
         }
       );
 
-      // First encrypt the tokens using the database function
-      console.log(`[${requestId}] Encrypting access token...`);
-      const { data: encryptedTokens, error: encryptError } = await serviceSupabase
-        .rpc('encrypt_token', { token: tokens.access_token });
+      // Use the secure token storage function
+      console.log(`[${requestId}] Calling secure token update function...`);
+      const { data: tokenResult, error: tokenError } = await serviceSupabase
+        .rpc('secure_update_social_tokens', { 
+          account_id: account.id,
+          new_access_token: tokens.access_token,
+          new_refresh_token: tokens.refresh_token || null,
+          new_expires_at: tokens.expires_in ? 
+            new Date(Date.now() + (tokens.expires_in * 1000)).toISOString() : null
+        });
 
-      console.log(`[${requestId}] Access token encryption result:`, { 
-        success: !!encryptedTokens, 
-        error: encryptError?.message 
+      console.log(`[${requestId}] Secure token storage result:`, { 
+        success: !!tokenResult, 
+        error: tokenError?.message 
       });
 
-      if (encryptError) {
-        console.log(`[${requestId}] Token encryption failed: ${encryptError.message}`);
+      if (tokenError) {
+        console.log(`[${requestId}] Secure token storage failed: ${tokenError.message}`);
+        console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenError, null, 2));
         return new Response(JSON.stringify({ 
-          error: 'Failed to encrypt tokens',
-          details: encryptError.message,
-          step: 'token_encryption'
+          error: 'Failed to store tokens securely',
+          details: tokenError.message,
+          code: tokenError.code,
+          step: 'secure_token_storage'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
-      if (!encryptedTokens) {
-        console.log(`[${requestId}] No encrypted token returned from encrypt_token function`);
-        return new Response(JSON.stringify({ 
-          error: 'Token encryption returned empty result',
-          step: 'token_encryption'
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      let encryptedRefreshToken = null;
-      if (tokens.refresh_token) {
-        console.log(`[${requestId}] Encrypting refresh token...`);
-        const { data: encRefreshToken, error: encRefreshError } = await serviceSupabase
-          .rpc('encrypt_token', { token: tokens.refresh_token });
-        
-        console.log(`[${requestId}] Refresh token encryption result:`, { 
-          success: !!encRefreshToken, 
-          error: encRefreshError?.message 
-        });
-        
-        if (encRefreshError) {
-          console.log(`[${requestId}] Refresh token encryption failed: ${encRefreshError.message}`);
-          return new Response(JSON.stringify({ 
-            error: 'Failed to encrypt refresh token',
-            details: encRefreshError.message,
-            step: 'refresh_token_encryption'
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        encryptedRefreshToken = encRefreshToken;
-      }
-
-      // Update the account with encrypted tokens directly using service role
-      console.log(`[${requestId}] Updating account with encrypted tokens...`, {
-        accountId: account.id,
-        hasAccessToken: !!encryptedTokens,
-        hasRefreshToken: !!encryptedRefreshToken
-      });
-      
-      const { error: tokenUpdateError } = await serviceSupabase
-        .from('social_media_accounts')
-        .update({
-          encrypted_access_token: encryptedTokens,
-          encrypted_refresh_token: encryptedRefreshToken,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', account.id);
-
-      if (tokenUpdateError) {
-        console.log(`[${requestId}] Token storage failed: ${tokenUpdateError.message}`);
-        console.log(`[${requestId}] Token error details:`, JSON.stringify(tokenUpdateError, null, 2));
-        return new Response(JSON.stringify({ 
-          error: 'Failed to store tokens',
-          details: tokenUpdateError.message,
-          code: tokenUpdateError.code,
-          step: 'token_storage'
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      console.log(`[${requestId}] Step 5 completed: Tokens stored successfully via direct update`);
+      console.log(`[${requestId}] Step 5 completed: Tokens stored securely`);
       
       // Step 6: Trigger initial stats sync
       console.log(`[${requestId}] Step 6: Triggering initial stats sync`);
