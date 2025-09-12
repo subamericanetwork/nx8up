@@ -146,16 +146,22 @@ export default function CreatorDashboard() {
         }
       });
 
-      console.log('Function response:', { data, error });
+      console.log('Function response - data:', JSON.stringify(data, null, 2));
+      console.log('Function response - error:', JSON.stringify(error, null, 2));
 
       if (error) {
-        console.error('Function invocation error:', error);
+        console.error('Function invocation error details:', error);
         throw error;
       }
 
-      if (!data || !data.success) {
+      if (!data) {
+        console.error('No data returned from function');
+        throw new Error('No response data received');
+      }
+
+      if (!data.success) {
         console.error('Function returned unsuccessful result:', data);
-        throw new Error(data?.error || 'Unknown error occurred');
+        throw new Error(data?.error || data?.message || 'Unknown error occurred');
       }
 
       console.log('OAuth callback completed successfully:', data);
@@ -168,15 +174,20 @@ export default function CreatorDashboard() {
       // Clean up URL and reload dashboard data
       window.history.replaceState({}, document.title, '/creator-dashboard');
       
-      // Refresh social media stats component
-      setTimeout(() => {
+      // Check if account was actually created
+      setTimeout(async () => {
+        console.log('Checking if account was saved to database...');
+        const { data: accounts, error: checkError } = await supabase
+          .rpc('social_media_accounts_safe');
+        console.log('Accounts after OAuth:', accounts, 'Error:', checkError);
+        
         if ((window as any).refreshSocialMediaStats) {
           (window as any).refreshSocialMediaStats();
         }
       }, 1000);
       
     } catch (error) {
-      console.error('OAuth callback error:', error);
+      console.error('OAuth callback error details:', error);
       toast({
         title: 'Connection Failed',
         description: `Failed to connect ${platform} account: ${error.message || 'Please try again.'}`,
