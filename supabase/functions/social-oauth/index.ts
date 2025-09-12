@@ -20,12 +20,26 @@ serve(async (req) => {
     // Read and parse request body with error handling
     let body;
     try {
-      body = await req.json();
-      console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2));
+      const rawBody = await req.text();
+      console.log(`[${requestId}] Raw request body:`, rawBody);
+      
+      if (!rawBody || rawBody.trim() === '') {
+        console.error(`[${requestId}] Empty request body received`);
+        return new Response(JSON.stringify({ 
+          error: 'Empty request body' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      body = JSON.parse(rawBody);
+      console.log(`[${requestId}] Parsed request body:`, JSON.stringify(body, null, 2));
     } catch (parseError) {
       console.error(`[${requestId}] Failed to parse request body:`, parseError);
       return new Response(JSON.stringify({ 
-        error: 'Invalid JSON in request body' 
+        error: 'Invalid JSON in request body',
+        details: parseError.message
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -34,11 +48,30 @@ serve(async (req) => {
     
     const { action, platform, code, redirect_url } = body;
 
+    console.log(`[${requestId}] Extracted parameters:`, {
+      action: action || 'MISSING',
+      platform: platform || 'MISSING',
+      hasCode: !!code,
+      codeLength: code?.length || 0,
+      redirect_url: redirect_url || 'MISSING'
+    });
+
     // Validate required fields
     if (!action || !platform) {
-      console.error(`[${requestId}] Missing required fields:`, { action, platform });
+      console.error(`[${requestId}] Missing required fields:`, { 
+        action: action || 'MISSING', 
+        platform: platform || 'MISSING',
+        bodyKeys: Object.keys(body || {}),
+        bodyValues: body
+      });
       return new Response(JSON.stringify({ 
-        error: 'Missing required fields: action and platform' 
+        error: 'Missing required fields: action and platform',
+        received: {
+          action: action || null,
+          platform: platform || null,
+          bodyKeys: Object.keys(body || {}),
+          rawBody: body
+        }
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
