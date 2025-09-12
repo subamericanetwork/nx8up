@@ -205,6 +205,34 @@ serve(async (req) => {
       throw new Error('Missing required parameters: action and platform');
     }
 
+    // Auto-detect the correct domain from the request headers
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '');
+    const actualRedirectUrl = redirect_url || `${origin}/creator-dashboard`;
+    
+    console.log('Domain detection:', {
+      origin,
+      referer: req.headers.get('referer'),
+      provided_redirect_url: redirect_url,
+      actual_redirect_url: actualRedirectUrl
+    });
+
+    // Validate required parameters
+    if (!action || !platform) {
+      console.error('Missing required parameters:', { action, platform });
+      throw new Error('Missing required parameters: action and platform');
+    }
+
+    // Auto-detect the correct domain from the request headers
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '');
+    const actualRedirectUrl = redirect_url || `${origin}/creator-dashboard`;
+    
+    console.log('Domain detection:', {
+      origin,
+      referer: req.headers.get('referer'),
+      provided_redirect_url: redirect_url,
+      actual_redirect_url: actualRedirectUrl
+    });
+
     // Check if required environment variables exist
     const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
     const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
@@ -217,12 +245,14 @@ serve(async (req) => {
 
     if (action === 'connect') {
       // Step 1: Generate OAuth URL
-      const config = getOAuthConfig(platform, redirect_url);
+      const config = getOAuthConfig(platform, actualRedirectUrl);
       
       if (!config || !config.client_id) {
         console.error(`OAuth not configured for ${platform}`, { config });
         throw new Error(`OAuth not configured for ${platform}. Missing client ID.`);
       }
+
+      console.log('Using redirect URL:', config.redirect_uri);
 
       // Generate state parameter for CSRF protection
       const stateParam = crypto.randomUUID();
