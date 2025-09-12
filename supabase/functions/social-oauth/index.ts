@@ -98,6 +98,7 @@ serve(async (req) => {
     // ============= CALLBACK ACTION =============
     if (action === 'callback') {
       console.log('=== PROCESSING CALLBACK ===');
+      console.log('Step 0: Callback action started successfully');
       console.log('Step 1: Exchanging code for token...');
       
       // Use the SAME redirect URI as connect - must match Google Console configuration
@@ -221,6 +222,7 @@ serve(async (req) => {
       console.log('Authenticated user:', user.id);
 
       console.log('Step 5: Saving to database...');
+      
       const accountData = {
         creator_id: user.id,
         platform: 'youtube',
@@ -231,7 +233,10 @@ serve(async (req) => {
         is_active: true,
         connected_at: new Date().toISOString()
       };
+      
+      console.log('Account data to save:', JSON.stringify(accountData, null, 2));
 
+      console.log('Creating service role client for database operations...');
       // Use service role client for database operations (required by RLS policies)
       const serviceRoleSupabase = createClient(
         Deno.env.get('SUPABASE_URL') || '',
@@ -243,12 +248,23 @@ serve(async (req) => {
           }
         }
       );
+      console.log('Service role client created successfully');
 
+      console.log('Attempting to upsert social media account...');
       const { data: savedAccount, error: dbError } = await serviceRoleSupabase
         .from('social_media_accounts')
         .upsert(accountData, { onConflict: 'creator_id,platform' })
         .select()
         .maybeSingle();
+      
+      console.log('Upsert result:', { 
+        hasData: !!savedAccount, 
+        dataId: savedAccount?.id,
+        hasError: !!dbError,
+        errorMessage: dbError?.message,
+        errorCode: dbError?.code,
+        errorDetails: dbError?.details
+      });
 
       if (dbError) {
         console.log('Database error:', dbError.message);
