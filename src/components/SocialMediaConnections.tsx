@@ -88,7 +88,13 @@ export default function SocialMediaConnections() {
   };
 
   const handleConnect = async (platform: string) => {
-    console.log('=== CONNECT BUTTON CLICKED ===', { platform, user: !!user });
+    console.log('=== CONNECT BUTTON CLICKED ===', { 
+      platform, 
+      user: !!user,
+      userId: user?.id,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent
+    });
     
     const config = platformConfig[platform as keyof typeof platformConfig];
     
@@ -150,7 +156,12 @@ export default function SocialMediaConnections() {
         
         // Set up message listener for OAuth callback
         const messageListener = (event: MessageEvent) => {
-          console.log('Received message from popup:', event.data, 'from origin:', event.origin);
+          console.log('🔍 RECEIVED MESSAGE FROM POPUP:', {
+            data: event.data,
+            origin: event.origin,
+            timestamp: new Date().toISOString(),
+            popup_closed: popup?.closed
+          });
           
           // Accept messages from any origin for cross-origin compatibility
           if (event.data?.type === 'OAUTH_CALLBACK') {

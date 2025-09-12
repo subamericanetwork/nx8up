@@ -13,12 +13,16 @@ export default function OAuthCallback() {
       const errorParam = searchParams.get('error');
       const state = searchParams.get('state');
       
-      console.log('OAuth callback URL params:', {
+      console.log('🚀 OAUTH CALLBACK PAGE LOADED:', {
         code: !!code,
+        codeLength: code?.length || 0,
         error: errorParam,
         state,
         fullURL: window.location.href,
-        searchParams: Object.fromEntries(searchParams.entries())
+        searchParams: Object.fromEntries(searchParams.entries()),
+        timestamp: new Date().toISOString(),
+        hasOpener: !!window.opener,
+        openerClosed: window.opener?.closed
       });
       
       // Extract platform from state parameter
