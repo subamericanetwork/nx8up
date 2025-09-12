@@ -118,7 +118,7 @@ serve(async (req) => {
     // ============= CALLBACK ACTION =============
     if (action === 'callback') {
       console.log('=== PROCESSING CALLBACK REQUEST ===');
-      console.log('Callback validation - Code exists:', !!code, 'Platform:', platform);
+      console.log('STEP 1: Callback validation - Code exists:', !!code, 'Platform:', platform);
       
       if (!code) {
         console.log('ERROR: No authorization code provided');
@@ -131,6 +131,7 @@ serve(async (req) => {
         });
       }
 
+      console.log('STEP 2: Checking required secrets');
       // Check required secrets
       if (!Deno.env.get('GOOGLE_CLIENT_SECRET')) {
         console.log('ERROR: GOOGLE_CLIENT_SECRET missing');
@@ -152,7 +153,7 @@ serve(async (req) => {
         });
       }
 
-      console.log('All validations passed - proceeding with callback...');
+      console.log('STEP 3: All validations passed - proceeding with callback...');
       
       try {
         console.log('=== STARTING CALLBACK PROCESSING ===');
@@ -456,10 +457,30 @@ serve(async (req) => {
         });
 
       } catch (error) {
-        console.log('Callback processing error:', error.message);
+        console.log('=== CALLBACK PROCESSING ERROR ===');
+        console.log('Error name:', error.name);
+        console.log('Error message:', error.message);
+        console.log('Error stack:', error.stack);
+        console.log('Error type:', typeof error);
+        console.log('Full error object:', JSON.stringify(error, null, 2));
+        
+        // Log additional context about where we might have failed
+        console.log('Request method:', req.method);
+        console.log('Request URL:', req.url);
+        console.log('Has auth header:', !!req.headers.get('authorization'));
+        console.log('Environment vars available:', {
+          SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
+          SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+          GOOGLE_CLIENT_ID: !!Deno.env.get('GOOGLE_CLIENT_ID'),
+          GOOGLE_CLIENT_SECRET: !!Deno.env.get('GOOGLE_CLIENT_SECRET')
+        });
+        
         return new Response(JSON.stringify({ 
           error: 'Callback processing failed',
-          details: error.message
+          details: error.message,
+          name: error.name,
+          type: typeof error,
+          stack: error.stack?.split('\n').slice(0, 5) // First 5 lines of stack
         }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
