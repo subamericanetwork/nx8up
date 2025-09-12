@@ -89,6 +89,11 @@ serve(async (req) => {
     // ============= CALLBACK ACTION =============
     if (action === 'callback') {
       console.log('=== PROCESSING CALLBACK REQUEST ===');
+      console.log('Callback data check:', {
+        hasCode: !!code,
+        codeLength: code?.length || 0,
+        platform: platform
+      });
       
       if (!code) {
         console.log('ERROR: No authorization code provided');
@@ -100,7 +105,29 @@ serve(async (req) => {
         });
       }
 
+      // Early validation of required secrets for callback
+      if (!Deno.env.get('GOOGLE_CLIENT_SECRET')) {
+        console.log('ERROR: GOOGLE_CLIENT_SECRET missing for callback');
+        return new Response(JSON.stringify({ 
+          error: 'Google Client Secret not configured' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+        console.log('ERROR: SUPABASE_SERVICE_ROLE_KEY missing for callback');
+        return new Response(JSON.stringify({ 
+          error: 'Supabase Service Role Key not configured' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       console.log('Step 1: Exchanging code for token...');
+      console.log('About to make token exchange request to Google...');
       const authRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
