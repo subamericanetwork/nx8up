@@ -36,10 +36,13 @@ serve(async (req) => {
       throw new Error('Missing action or platform');
     }
 
-    // Auto-detect domain
-    const origin = req.headers.get('origin') || 'https://nx8up.lovable.app';
-    const actualRedirectUrl = `${origin}/creator-dashboard`;
-    console.log('🌐 Using redirect URL:', actualRedirectUrl);
+    // Auto-detect domain properly
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/[^/]*$/, '') || 'https://36d74c24-a521-4533-aa15-00a437291e31.sandbox.lovable.dev';
+    const cleanOrigin = origin.replace('https://', '').replace('http://', '');
+    const actualRedirectUrl = `https://${cleanOrigin}/creator-dashboard`;
+    console.log('🌐 Raw origin:', origin);
+    console.log('🌐 Clean origin:', cleanOrigin);
+    console.log('🌐 Redirect URL:', actualRedirectUrl);
 
     if (action === 'connect') {
       console.log('🔗 Processing CONNECT request');
