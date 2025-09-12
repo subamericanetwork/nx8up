@@ -172,6 +172,12 @@ serve(async (req) => {
         });
 
         console.log('Exchanging code for tokens...');
+        console.log('Token request data:', {
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID')?.substring(0, 20) + '...',
+          code: code.substring(0, 20) + '...',
+          redirect_uri: 'https://nx8up.lovable.app/oauth/callback'
+        });
+        
         const tokenResponse = await fetch(tokenUrl, {
           method: 'POST',
           headers: {
@@ -180,13 +186,16 @@ serve(async (req) => {
           body: tokenData,
         });
 
+        console.log('Token response status:', tokenResponse.status);
+        
         if (!tokenResponse.ok) {
           console.log('Token exchange failed:', tokenResponse.status, tokenResponse.statusText);
           const errorText = await tokenResponse.text();
           console.log('Token exchange error response:', errorText);
           return new Response(JSON.stringify({ 
             error: 'Token exchange failed',
-            details: errorText
+            details: errorText,
+            status: tokenResponse.status
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -272,6 +281,15 @@ serve(async (req) => {
           });
         }
 
+        console.log('Creating social media account...');
+        console.log('Account data:', {
+          creator_id: user.id,
+          platform: 'youtube',
+          platform_user_id: channel.id,
+          username: channel.snippet.customUrl || channel.snippet.title,
+          display_name: channel.snippet.title,
+        });
+
         // Create or update social media account
         const { data: account, error: accountError } = await supabase
           .from('social_media_accounts')
@@ -293,11 +311,14 @@ serve(async (req) => {
           .select()
           .single();
 
+        console.log('Account creation result:', { account: !!account, error: accountError });
+
         if (accountError) {
-          console.log('Account creation error:', accountError);
+          console.log('Account creation error details:', accountError);
           return new Response(JSON.stringify({ 
             error: 'Failed to create social media account',
-            details: accountError.message
+            details: accountError.message,
+            code: accountError.code
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
