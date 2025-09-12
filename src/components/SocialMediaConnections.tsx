@@ -262,12 +262,17 @@ export default function SocialMediaConnections() {
     try {
       console.log('Processing OAuth callback for platform:', platform);
       
+      // Use the same redirect URL logic as the connect flow
+      const redirectUrl = window.location.hostname.includes('sandbox.lovable.dev') 
+        ? 'https://nx8up.loveable.app/creator-dashboard'
+        : `${window.location.origin}/creator-dashboard`;
+      
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
           action: 'callback',
           platform,
           code,
-          redirect_url: `${window.location.origin}/creator-dashboard`
+          redirect_url: redirectUrl
         }
       });
 
