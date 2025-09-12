@@ -235,8 +235,14 @@ serve(async (req) => {
       );
 
       // First encrypt the tokens using the database function
+      console.log(`[${requestId}] Encrypting access token...`);
       const { data: encryptedTokens, error: encryptError } = await serviceSupabase
         .rpc('encrypt_token', { token: tokens.access_token });
+
+      console.log(`[${requestId}] Access token encryption result:`, { 
+        success: !!encryptedTokens, 
+        error: encryptError?.message 
+      });
 
       if (encryptError) {
         console.log(`[${requestId}] Token encryption failed: ${encryptError.message}`);
@@ -250,10 +256,27 @@ serve(async (req) => {
         });
       }
 
+      if (!encryptedTokens) {
+        console.log(`[${requestId}] No encrypted token returned from encrypt_token function`);
+        return new Response(JSON.stringify({ 
+          error: 'Token encryption returned empty result',
+          step: 'token_encryption'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       let encryptedRefreshToken = null;
       if (tokens.refresh_token) {
+        console.log(`[${requestId}] Encrypting refresh token...`);
         const { data: encRefreshToken, error: encRefreshError } = await serviceSupabase
           .rpc('encrypt_token', { token: tokens.refresh_token });
+        
+        console.log(`[${requestId}] Refresh token encryption result:`, { 
+          success: !!encRefreshToken, 
+          error: encRefreshError?.message 
+        });
         
         if (encRefreshError) {
           console.log(`[${requestId}] Refresh token encryption failed: ${encRefreshError.message}`);
@@ -270,6 +293,12 @@ serve(async (req) => {
       }
 
       // Update the account with encrypted tokens directly using service role
+      console.log(`[${requestId}] Updating account with encrypted tokens...`, {
+        accountId: account.id,
+        hasAccessToken: !!encryptedTokens,
+        hasRefreshToken: !!encryptedRefreshToken
+      });
+      
       const { error: tokenUpdateError } = await serviceSupabase
         .from('social_media_accounts')
         .update({
