@@ -41,16 +41,20 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('Fetching social account with tokens...');
-    // Get the social media account details with tokens (service role access)
+    // Get the social media account details directly with service role (bypass RPC security issues)
     const { data: accountData, error: accountError } = await supabase
-      .rpc('get_social_account_with_tokens', { account_id: accountId });
+      .from('social_media_accounts')
+      .select('*')
+      .eq('id', accountId)
+      .eq('is_active', true)
+      .single();
     
-    if (accountError || !accountData || accountData.length === 0) {
+    if (accountError || !accountData) {
       console.error('Failed to fetch social account:', accountError);
       throw new Error(`Social media account not found: ${accountError?.message}`);
     }
     
-    const account = accountData[0]; // get_social_account_with_tokens returns an array
+    const account = accountData; // Direct object, not array
     console.log('Social account found:', {
       id: account.id,
       platform: account.platform, 
@@ -161,15 +165,15 @@ async function fetchYouTubeStats(account: any): Promise<SocialStats> {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get decrypted tokens
-    const { data: tokenData, error: tokenError } = await supabase
-      .rpc('get_decrypted_tokens', { account_id: account.id });
+    // Get decrypted tokens directly using the service role client
+    const { data: accessTokenResult, error: accessTokenError } = await supabase
+      .rpc('decrypt_token', { encrypted_token: account.encrypted_access_token });
     
-    if (tokenError || !tokenData || tokenData.length === 0) {
-      throw new Error('Could not retrieve access token for YouTube account');
+    if (accessTokenError || !accessTokenResult) {
+      throw new Error('Could not decrypt access token for YouTube account');
     }
     
-    const accessToken = tokenData[0].access_token;
+    const accessToken = accessTokenResult;
     if (!accessToken) {
       throw new Error('No access token available for YouTube account');
     }
