@@ -106,6 +106,9 @@ export default function SocialMediaConnections() {
     
     try {
       console.log('Starting OAuth flow for platform:', platform);
+      console.log('Current window.location.href:', window.location.href);
+      console.log('Current window.location.origin:', window.location.origin);
+      console.log('Redirect URL will be:', `${window.location.origin}/creator-dashboard`);
       
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
