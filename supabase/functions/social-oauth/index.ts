@@ -11,6 +11,11 @@ serve(async (req) => {
   
   console.log(`[${requestId}] OAUTH FUNCTION START - ${req.method} ${req.url}`);
   
+  // Add detailed request debugging
+  console.log(`[${requestId}] Request method: ${req.method}`);
+  console.log(`[${requestId}] Request URL: ${req.url}`);
+  console.log(`[${requestId}] Request headers:`, Object.fromEntries(req.headers.entries()));
+  
   try {
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
@@ -65,20 +70,27 @@ serve(async (req) => {
 
     // Validate required fields
     if (!action || !platform) {
-      console.error(`[${requestId}] Missing required fields:`, { 
+      console.error(`[${requestId}] VALIDATION FAILURE - Missing required fields:`, { 
         action: action || 'MISSING', 
         platform: platform || 'MISSING',
         bodyKeys: Object.keys(body || {}),
-        bodyValues: body
+        bodyStringified: JSON.stringify(body, null, 2),
+        actionType: typeof action,
+        platformType: typeof platform,
+        actionTruthy: !!action,
+        platformTruthy: !!platform
       });
       return new Response(JSON.stringify({ 
         error: 'Missing required fields: action and platform',
-        received: {
+        debug: {
           action: action || null,
           platform: platform || null,
+          actionType: typeof action,
+          platformType: typeof platform,
           bodyKeys: Object.keys(body || {}),
           rawBody: body
-        }
+        },
+        requestId: requestId
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -136,10 +148,25 @@ serve(async (req) => {
       }
 
       if (!platform || platform !== 'youtube') {
-        console.error(`[${requestId}] Invalid platform:`, platform);
+        console.error(`[${requestId}] PLATFORM VALIDATION FAILURE:`, {
+          platform: platform,
+          platformType: typeof platform,
+          platformLength: platform?.length,
+          platformTrimmed: platform?.trim(),
+          isYoutube: platform === 'youtube',
+          comparison: `'${platform}' !== 'youtube'`,
+          platformBytes: platform ? Array.from(platform).map(c => c.charCodeAt(0)) : 'null'
+        });
         return new Response(JSON.stringify({ 
           error: 'Invalid platform. Only youtube is supported.',
-          platform: platform,
+          debug: {
+            received: platform,
+            expected: 'youtube',
+            type: typeof platform,
+            length: platform?.length,
+            trimmed: platform?.trim(),
+            bytes: platform ? Array.from(platform).map(c => c.charCodeAt(0)) : null
+          },
           requestId: requestId
         }), {
           status: 400,
