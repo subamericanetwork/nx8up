@@ -157,13 +157,18 @@ export default function CreatorDashboard() {
         description: `Connecting your ${platform} account`,
       });
 
+      // Use the same redirect URL logic as the connect flow
+      const redirectUrl = window.location.hostname.includes('sandbox.lovable.dev') 
+        ? 'https://nx8up.loveable.app/creator-dashboard'
+        : `${window.location.origin}/creator-dashboard`;
+
       console.log('Invoking social-oauth function with callback action...');
       const { data, error } = await supabase.functions.invoke('social-oauth', {
         body: { 
           action: 'callback',
           platform,
           code,
-          redirect_url: `${window.location.origin}/creator-dashboard`
+          redirect_url: redirectUrl
         }
       });
 

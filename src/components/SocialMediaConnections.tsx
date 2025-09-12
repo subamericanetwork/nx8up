@@ -171,7 +171,8 @@ export default function SocialMediaConnections() {
               if (popupUrl.includes(window.location.origin) || 
                   popupUrl.includes('lovable.app') || 
                   popupUrl.includes('lovable.dev') ||
-                  popupUrl.includes('sandbox.lovable.dev')) {
+                  popupUrl.includes('sandbox.lovable.dev') ||
+                  popupUrl.includes('nx8up.loveable.app')) {
                 const urlParams = new URLSearchParams(new URL(popupUrl).search);
                 const code = urlParams.get('code');
                 const error = urlParams.get('error');
