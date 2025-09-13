@@ -9,20 +9,19 @@ const corsHeaders = {
 serve(async (req) => {
   const requestId = crypto.randomUUID().substring(0, 8);
   
-  console.log(`[${requestId}] OAUTH FUNCTION START - ${req.method} ${req.url}`);
-  
-  // Add detailed request debugging
-  console.log(`[${requestId}] Request method: ${req.method}`);
-  console.log(`[${requestId}] Request URL: ${req.url}`);
-  console.log(`[${requestId}] Request headers:`, Object.fromEntries(req.headers.entries()));
-  
-  // Create service role client at the beginning
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') || '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-  );
-  
   try {
+    console.log(`[${requestId}] OAUTH FUNCTION START - ${req.method} ${req.url}`);
+    
+    // Add detailed request debugging
+    console.log(`[${requestId}] Request method: ${req.method}`);
+    console.log(`[${requestId}] Request URL: ${req.url}`);
+    console.log(`[${requestId}] Request headers:`, Object.fromEntries(req.headers.entries()));
+    
+    // Create service role client at the beginning
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -171,6 +170,10 @@ serve(async (req) => {
         platform: platform,
         codeLength: code?.length || 0
       });
+      
+      // Define the callback redirect URI - must match what was used in the connect action
+      const callbackRedirectUri = 'https://nx8up.lovable.app/oauth/callback';
+      console.log(`[${requestId}] Using callback redirect URI: ${callbackRedirectUri}`);
       
       if (!code) {
         console.error(`[${requestId}] Missing authorization code`);
