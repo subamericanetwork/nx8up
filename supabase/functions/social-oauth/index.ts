@@ -305,19 +305,6 @@ serve(async (req) => {
         const tokens = JSON.parse(responseText);
         console.log(`[${requestId}] SUCCESS: Tokens received`);
         
-        // For now, just return success without database operations
-        return new Response(JSON.stringify({ 
-          success: true,
-          message: 'Token exchange successful',
-          account: {
-            platform: 'youtube',
-            username: 'test-user',
-            display_name: 'Test User'
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-        
       } catch (fetchError) {
         console.error(`[${requestId}] Fetch error:`, fetchError);
         return new Response(JSON.stringify({ 
@@ -328,8 +315,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-
-      const tokens = await tokenResponse.json();
       console.log(`[${requestId}] Step 1 completed: Tokens received`, {
         hasAccessToken: !!tokens.access_token,
         hasRefreshToken: !!tokens.refresh_token,
