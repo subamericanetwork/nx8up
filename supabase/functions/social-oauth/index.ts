@@ -289,16 +289,32 @@ serve(async (req) => {
         console.log(`[${requestId}] Google response body: ${responseText}`);
         
         if (!tokenResponse.ok) {
-          // Return the exact Google error
+          console.error(`[${requestId}] GOOGLE OAUTH FAILED - Status: ${tokenResponse.status}`);
+          console.error(`[${requestId}] Client ID being used: ${clientId.substring(0, 20)}...`);
+          console.error(`[${requestId}] Redirect URI being used: ${callbackRedirectUri}`);
+          console.error(`[${requestId}] Code being used: ${code.substring(0, 20)}...`);
+          
+          // Return the exact Google error with more debugging info
           return new Response(JSON.stringify({ 
-            error: 'Google OAuth Error',
+            error: 'Google OAuth Configuration Error',
+            message: 'The Google OAuth credentials or settings are incorrect. Please verify your Google Cloud Console configuration.',
             status: tokenResponse.status,
             googleResponse: responseText,
-            requestDetails: {
+            debugInfo: {
+              clientIdPrefix: clientId.substring(0, 20) + '...',
               clientIdLength: clientId.length,
               codeLength: code.length,
-              redirectUri: callbackRedirectUri
-            }
+              redirectUri: callbackRedirectUri,
+              expectedRedirectUri: 'https://nx8up.lovable.app/oauth/callback'
+            },
+            instructions: [
+              '1. Go to Google Cloud Console > APIs & Credentials > OAuth 2.0 Client IDs',
+              '2. Find your Web application client',
+              '3. Add "https://nx8up.lovable.app" to Authorized JavaScript origins',
+              '4. Add "https://nx8up.lovable.app/oauth/callback" to Authorized redirect URIs',
+              '5. Save the changes and wait 5-10 minutes for propagation',
+              '6. Verify the Client ID and Secret in Supabase secrets match your Google Console'
+            ]
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
